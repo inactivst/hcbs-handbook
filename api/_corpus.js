@@ -1414,6 +1414,288 @@ export const STATES = {
   text: `If you or someone you know is being abused, neglected, or exploited, contact the Wyoming Department of Family Services. Their main toll-free number is 1-800-457-3659, or you can contact your local DFS office directly. If someone is in immediate danger, call 911 first. For free legal help protecting your rights around intellectual or developmental disability services, contact the Protection and Advocacy System, Inc. at 1-800-624-7648, which is their toll-free line for the Intellectual and Developmental Disabilities program. They are Wyoming's official protection and advocacy organization for people with disabilities, and their help is free. You will not get in trouble for reporting a problem or for asking them for help.`,
 },
   ], serviceCodes: [] },
+  AK: { name: "Alaska", chunks: [
+{
+  id: 'ak-agency-waivers',
+  title: 'Alaska: who runs HCBS and the main waiver programs',
+  citation: 'Alaska Department of Health, Division of Senior and Disabilities Services (SDS); IDD Waiver, Individualized Supports Waiver (ISW), Alaskans with Physical and Developmental Disabilities (APDD) Waiver',
+  text: `In Alaska, the Department of Health runs Medicaid waiver services through the Division of Senior and Disabilities Services, known as SDS. For people with intellectual and developmental disabilities, the main program is the IDD Waiver. SDS also runs the Individualized Supports Waiver, called ISW, and the Alaskans with Physical and Developmental Disabilities Waiver, called APDD, for adults 21 and older who need nursing-level care. These waivers pay for things like respite care, help around the house, residential support, and environmental changes to your home, so you can stay in your community instead of an institution. Alaska has more people wanting services than the state can fund right away, so there is a waitlist. Each year, the state draws a limited number of people from the waitlist to apply for the IDD Waiver. You can call an Aging and Disability Resource Center at 1-877-625-2372 to start the process or ask questions about where you stand on a waitlist.`,
+},
+{
+  id: 'ak-rights',
+  title: 'Alaska: your legal rights as a person with a disability',
+  citation: 'Alaska Statute 47.80.010 (Rights of persons with disabilities); AS 47.80.020 (Protection and advocacy of rights)',
+  text: `Alaska has a state law that protects you if you have a disability. It is AS 47.80.010, and it says you have the same legal rights as everyone else under the U.S. Constitution and Alaska law. You cannot be shut out of a program or service that gets public money just because you have a disability. The law also recognizes that some people may need help using their rights in a meaningful way, and if any right is ever modified for someone, the law requires legal safeguards against abuse of that process. A related section, AS 47.80.020, sets up protection and advocacy of these rights in Alaska. If you feel your rights under this law were not respected, you can ask for help from the state or from Alaska's protection and advocacy organization.`,
+},
+{
+  id: 'ak-service-plan',
+  title: 'Alaska: your service plan (the Plan of Care)',
+  citation: 'Alaska SDS Policy and Procedure Manual, Section 4 (IDD Waivers)',
+  text: `In Alaska, your services are laid out in a document called a Plan of Care. When you are chosen for a waiver, you pick a Care Coordinator, who is a case manager that helps you figure out what supports you need and who will provide them. The Care Coordinator writes the Plan of Care with you, centered on what you want your life to look like, and then sends it to SDS for approval before any services can be paid for. SDS checks in every year to make sure you still qualify for the program, and your Care Coordinator prepares a new Plan of Care as part of that yearly renewal. Your Care Coordinator is supposed to start the renewal paperwork early, well before your current approval period runs out, so your services do not get interrupted. You can also ask your Care Coordinator to update your plan any time your needs or goals change during the year.`,
+},
+{
+  id: 'ak-appeals',
+  title: 'Alaska: how to appeal if services are denied or cut',
+  citation: 'Alaska fair hearing process; Office of Administrative Hearings (OAH)',
+  text: `If Alaska denies, reduces, or stops your Medicaid services, you have the right to ask for a fair hearing. In general, you must request the hearing within 30 days of the date on your decision notice. Your hearing is heard by a judge at the state Office of Administrative Hearings, known as OAH. Here is an important detail: if you are already getting services and you ask for a hearing before the date your services are set to change, usually within 10 days of the notice, your services can keep going at the same level while you wait for a decision. This is sometimes called aid paid pending. Always check the actual notice you received, since it lists your exact deadline and the address or online system to use to file. If you are not sure, ask your Care Coordinator or call SDS for help figuring out the process.`,
+},
+{
+  id: 'ak-complaints-pna',
+  title: 'Alaska: reporting problems and free advocacy help',
+  citation: 'Alaska Adult Protective Services (APS) 1-800-478-9996; Disability Law Center of Alaska 1-800-478-1234',
+  text: `If you or someone you know is being abused, neglected, or exploited, call Alaska Adult Protective Services at 1-800-478-9996. This is the state hotline, and staff there can also direct you to Centralized Reporting for other kinds of harm. If it is an emergency, call 911 or local law enforcement first, then make the report to APS. For free legal help protecting your rights, contact the Disability Law Center of Alaska at 1-800-478-1234. This is Alaska's official protection and advocacy organization for people with disabilities, and their services are free. You will not get in trouble for reporting a problem or for asking for help.`,
+},
+  ], serviceCodes: [] },
+  CO: { name: "Colorado", chunks: [
+{
+  id: 'co-agency-waivers',
+  title: 'Colorado: who runs HCBS and the main waiver programs',
+  citation: 'Colorado Department of Health Care Policy and Financing (HCPF); HCBS-DD (Developmental Disabilities) and Supported Living Services (SLS) waivers',
+  text: `In Colorado, the Department of Health Care Policy and Financing, often called HCPF, runs the Medicaid home and community-based waivers for people with intellectual and developmental disabilities. The main waiver for people who need supports around the clock is the HCBS-DD waiver, and the Supported Living Services waiver, or SLS, serves people who need less intensive support. A Case Management Agency, sometimes still called a Community-Centered Board in your area, is your local front door for applying and staying connected. The HCBS-DD waiver has a waiting list, split into two lists called As Soon As Available and Safety Net, so ask your Case Management Agency to help you get on a list as early as possible if you think you may need this waiver.`,
+},
+{
+  id: 'co-rights',
+  title: 'Colorado: your legal rights as a person with an intellectual or developmental disability',
+  citation: 'Colorado Revised Statutes Section 27-10.5-110.5, which points to rights listed in Sections 25.5-10-223 through 25.5-10-230',
+  text: `Colorado has a law that protects the rights of people receiving services because of an intellectual or developmental disability. Section 27-10.5-110.5 of the Colorado Revised Statutes says that everyone receiving these services has the rights spelled out in a related part of the law, Sections 25.5-10-223 through 25.5-10-230. Because this pack was drafted by reading summaries and cross-references rather than the full text of every one of those sections, the team should pull the exact list of rights from 25.5-10-223 through 230 before this chunk is published, so the specific rights can be named for readers. If you believe your rights have been violated, you can raise it with your case manager, your provider, or Disability Law Colorado.`,
+},
+{
+  id: 'co-service-plan',
+  title: 'Colorado: your service plan (the Person-Centered Support Plan)',
+  citation: 'Colorado Revised Statutes Section 25.5-6-1705; HCPF Person-Centered Support Plan (PCSP) and Colorado Single Assessment',
+  text: `In Colorado, your main plan is called a Person-Centered Support Plan, or PCSP. It is developed and managed by your Case Management Agency, based on your needs and your personal goals, and it describes the services that help you avoid living in an institution and get support in the setting you choose. Your PCSP is built using information from the Colorado Single Assessment, which looks at your support needs, and a Support Level Algorithm that is run again at your annual reassessment. Your plan must be reviewed at least once a year and updated whenever it is needed, not just on the yearly schedule. Speak up to your case manager any time your needs or goals change so your plan can be updated sooner.`,
+},
+{
+  id: 'co-appeals',
+  title: 'Colorado: how to appeal if services are denied or cut',
+  citation: 'Colorado Office of Administrative Courts (OAC), Public Benefits hearings; Health First Colorado (Medicaid) appeals process',
+  text: `If Colorado denies, reduces, or ends your Medicaid or HCBS services, you can ask for a hearing with the Office of Administrative Courts. You can file your request by mail, email, fax, hand delivery, online filing, or by calling the OAC at 303-866-5626. Hearings are usually scheduled about 4 to 8 weeks after your request is received, and you can ask for a faster, expedited hearing if waiting would put your health or safety at risk. Always check the notice you received for your exact appeal deadline. On keeping your services the same while you wait, Colorado's process is not automatic: you generally need to contact the agency that made the decision, tell them you are appealing, and ask them to continue your benefits, and if they refuse, you can ask an administrative law judge to order your services to continue. Colorado Legal Services can help you with this process for free.`,
+},
+{
+  id: 'co-complaints-pna',
+  title: 'Colorado: reporting problems and free advocacy help',
+  citation: 'Colorado at-risk adult mistreatment hotline 1-844-264-5437; Disability Law Colorado 303-722-0300 or 1-800-288-1376',
+  text: `If you or someone you know is being abused, neglected, or exploited, call Colorado's at-risk adult mistreatment hotline at 1-844-264-5437. It is available 24 hours a day, every day, and your call will be confidential and routed to the county where the person lives. If it is an emergency, call 911 first. For free legal help with your rights, contact Disability Law Colorado at 303-722-0300, or toll free at 1-800-288-1376, both voice and TTY. Disability Law Colorado is the official protection and advocacy organization for Coloradans with disabilities, and their help is free. You will not get in trouble for reporting a problem or asking for help.`,
+},
+  ], serviceCodes: [] },
+  HI: { name: "Hawaii", chunks: [
+{
+  id: 'hi-agency-waivers',
+  title: 'Hawaii: who runs HCBS and the main waiver program',
+  citation: 'Hawaii Department of Health, Developmental Disabilities Division (DOH/DDD) and Department of Human Services, Med-QUEST Division (DHS/MQD); I/DD Waiver (1915c)',
+  text: `In Hawaii, two state agencies share the job of running Medicaid home and community based services for people with intellectual and developmental disabilities. The Department of Human Services Med-QUEST Division is the state Medicaid agency, and the Department of Health Developmental Disabilities Division, called DDD, actually operates the waiver day to day under an agreement between the two departments. The program is called the I/DD Waiver, a 1915(c) Medicaid waiver, and it pays for supports like day habilitation, respite for family caregivers, and supported employment so you can live at home or in the community instead of in an institution. To qualify, you must be eligible for DDD services, eligible for Medicaid, and meet a level of care requirement. A case manager helps you access these waiver services once you are approved.`,
+},
+{
+  id: 'hi-rights',
+  title: 'Hawaii: your legal rights as a person with a developmental or intellectual disability',
+  citation: 'Hawaii Revised Statutes Chapter 333F, Section 333F-8 (Rights of persons with developmental or intellectual disabilities)',
+  text: `Hawaii has a law, HRS Section 333F-8, that addresses your rights as a person with a developmental or intellectual disability. The broader chapter it belongs to, HRS Chapter 333F, says that services should be provided in the least restrictive, individually appropriate environment, meaning the setting that departs the least from normal life while still meeting your needs. The chapter's overall goal is for the state to build enough community services and housing choices so you can live and be treated with dignity in your own community rather than being placed in an institution unless that is truly necessary. Because the full text of Section 333F-8 was not directly accessible during this review, ask your DDD case manager or Hawaii Disability Rights Center for the complete, current list of specific rights this section guarantees.`,
+},
+{
+  id: 'hi-appeals',
+  title: 'Hawaii: how to appeal if services are denied or cut',
+  citation: 'Hawaii DDD Informal Review and Administrative Hearing process; DHS Administrative Appeals Office',
+  text: `If Hawaii denies, reduces, or ends your DDD waiver services, you have two options. You can ask DDD for an informal review, and you generally need to do that within 15 working days of the date on your notice. You can also ask for a formal Administrative Hearing through the Department of Human Services, and for Medicaid waiver participants that request generally needs to be made within 90 days of the date on your written notice. You do not have to try the informal review first if you would rather go straight to the formal hearing. Check your notice carefully, because it will have your exact deadlines and it should also say whether your services can keep going while you wait, which is called aid paid pending. Appeals for the formal hearing go to the DHS Administrative Appeals Office.`,
+},
+{
+  id: 'hi-complaints-pna',
+  title: 'Hawaii: reporting problems and free advocacy help',
+  citation: 'Hawaii Adult Protective and Community Services Branch (regional lines, Oahu 808-832-5115); Hawaii Disability Rights Center 1-800-882-1057',
+  text: `If you or someone you know is being abused, neglected, or financially exploited, you can report it to Hawaii's Adult Protective Services. The reporting line depends on your island: Oahu is 808-832-5115, Kauai is 808-241-3337, Maui, Molokai, and Lanai is 808-243-5151, East Hawaii is 808-933-8820, and West Hawaii is 808-327-6280. You can also file online at apsreport.hawaii.gov. You may report anonymously, and Hawaii law protects reporters from liability. If it is an emergency, call 911 first. For free legal help protecting your rights, contact the Hawaii Disability Rights Center, the state's official protection and advocacy organization, at 1-800-882-1057, or their Oahu line at 808-949-2922.`,
+},
+  ], serviceCodes: [] },
+  UT: { name: "Utah", chunks: [
+{
+  id: 'ut-agency-waivers',
+  title: 'Utah: who runs HCBS and the main waiver programs',
+  citation: 'Utah Division of Services for People with Disabilities (DSPD), part of the Department of Health and Human Services (DHHS); Community Supports, Community Transitions, and Limited Supports 1915(c) waivers',
+  text: `In Utah, the Division of Services for People with Disabilities, called DSPD, runs the Medicaid waiver programs for people with intellectual and developmental disabilities. DSPD is part of the Utah Department of Health and Human Services. The main waiver is the Community Supports Waiver, which helps people with intellectual or developmental disabilities stay in their own home or another community setting. The Community Transitions Waiver helps people move out of an institution and back into the community. The Limited Supports Waiver serves people with an acquired brain injury, intellectual disability, or a related condition who need a lower level of support, and it is often used by people who are still on the waiting list for other DSPD waivers. To apply, you generally start with DSPD, since it manages eligibility and enrollment for these programs.`,
+},
+{
+  id: 'ut-rights',
+  title: 'Utah: your legal rights as a person with a disability',
+  citation: 'Utah Code Title 62A, Chapter 5, Section 103 (Division responsibility and authority); Utah Code Title 62A, Chapter 5b (Rights and Privileges of an Individual with a Disability)',
+  text: `Utah law protects your rights in a couple of important ways. Utah Code 62A-5-103 says that DSPD must provide services and supports in the least restrictive and most enabling setting possible, and it must give you reasonable personal choice in picking services that support your independence and your place in community life. It also requires due process, meaning a fair legal process, before your constitutional rights can be limited, including before you are admitted to certain intermediate care facilities. Separately, Utah Code Chapter 5b, called Rights and Privileges of an Individual with a Disability, protects you from discrimination in areas like housing, and covers your right to be accompanied by a service or support animal. Together these laws are meant to protect your independence, your choices, and your place in your community.`,
+},
+{
+  id: 'ut-service-plan',
+  title: 'Utah: your service plan (the Person-Centered Support Plan)',
+  citation: 'Utah DSPD Support Coordination Manual; Person-Centered Support Plan (PCSP)',
+  text: `In Utah, your plan is called the Person-Centered Support Plan, or PCSP. A Support Coordinator works with you to build the plan, and it describes the supports and services you will get for the next 12 months, along with your personal preferences and the goals you want to reach. Because Medicaid requires an annual review, your PCSP is usually finished about one month before your current budget year ends, so your services can continue smoothly into the next year. You get to choose your own Support Coordinator, and you can ask to change coordinators if the relationship is not working for you. Speak up during planning about what matters most to you, since the PCSP is supposed to reflect your goals and choices, not just a standard list of services.`,
+},
+{
+  id: 'ut-appeals',
+  title: 'Utah: how to appeal if Medicaid services are denied or cut',
+  citation: 'Utah DHHS Office of Administrative Hearings; Utah Medicaid Fair Hearing Request Form',
+  text: `If Utah denies, reduces, or ends your Medicaid services, you can ask for a state fair hearing through the Department of Health and Human Services Office of Administrative Hearings. The deadline depends on what kind of decision you are appealing. In general, you have 30 days from the date of a denial notice from the Medicaid agency itself, 90 days if you are appealing a Medicaid or CHIP eligibility decision, or 120 days if you are appealing a managed care health plan's decision. If you want your services to keep going while your appeal is pending, request your hearing before the date your services are set to change, since that is what usually keeps your benefits in place during the wait. Because these deadlines depend on exactly what was decided, always check the notice you received for your specific deadline and instructions.`,
+},
+{
+  id: 'ut-complaints-pna',
+  title: 'Utah: reporting problems and free advocacy help',
+  citation: 'Utah Adult Protective Services 1-800-371-7897; Disability Law Center 1-800-662-9080',
+  text: `If you or someone you know is being abused, neglected, or exploited, you can report it to Utah Adult Protective Services at 1-800-371-7897, by phone Monday through Friday, 8 a.m. to 5 p.m., or you can report online any time, day or night. Utah law says any person who believes a vulnerable adult is being abused, neglected, or exploited must report it right away, and you are protected from liability when you report in good faith. If it is an emergency, call 911 first. For free legal help protecting your rights, contact the Disability Law Center at 1-800-662-9080. They are Utah's official Protection and Advocacy organization for people with disabilities, and their help is free.`,
+},
+  ], serviceCodes: [] },
+  VT: { name: "Vermont", chunks: [
+{
+  id: 'vt-agency-waivers',
+  title: 'Vermont: who runs HCBS and the main waiver program',
+  citation: 'Vermont Department of Disabilities, Aging and Independent Living (DAIL), Developmental Disabilities Services Division (DDSD); Developmental Disabilities (DD) Home and Community-Based Services Waiver under Vermont Global Commitment to Health',
+  text: `In Vermont, the Department of Disabilities, Aging and Independent Living, known as DAIL, oversees services for people with developmental disabilities. Inside DAIL, the Developmental Disabilities Services Division, called DDSD, runs the day-to-day programs. Vermont pays for home and community-based services through the Developmental Disabilities Home and Community-Based Services Waiver, which operates under the state's larger Global Commitment to Health Medicaid waiver rather than a standalone federal 1915(c) waiver like most states use. These services can include residential supports, employment help, and behavioral supports, and they are designed so you can live in your own home or community instead of an institution. Local Designated Agencies deliver most services on the ground under contract with DDSD. If you are not sure where to start, DDSD or your local Designated Agency can walk you through eligibility and how to apply.`,
+},
+{
+  id: 'vt-rights',
+  title: 'Vermont: your rights under the Developmental Disabilities Act',
+  citation: '18 V.S.A. chapter 204A (Developmental Disabilities Act), section 8724 (Principles of service)',
+  text: `Vermont has a state law called the Developmental Disabilities Act, found in Title 18, chapter 204A of Vermont law. Section 8724 lays out the principles every program funded under this law must follow. It says you have the opportunity to live in a safe environment with respect and dignity, to live with your family or in a home of your own choosing, to attend neighborhood schools, to work, to take part in community activities, and to get the same kind of community support and services that other Vermonters can access. These principles guide how DDSD and its Designated Agencies are supposed to design and deliver your services. If a service does not feel like it lines up with these principles, you can raise that concern with your case manager or with DDSD.`,
+},
+{
+  id: 'vt-service-plan',
+  title: 'Vermont: your service plan (the Individual Support Agreement)',
+  citation: 'Vermont DDSD person-centered planning process; Individual Support Agreement (ISA)',
+  text: `In Vermont, your plan is usually called an Individual Support Agreement, or ISA. It is a written agreement between you, your guardian if you have one, and the provider or providers giving you services, and it spells out the supports you will get. A case manager at your Designated Agency leads a person-centered planning process with you to build this plan around your goals and needs, then the plan goes to the state for approval. Vermont also uses an individualized budget tied to your plan, and the state reconciles what services were actually delivered against what was authorized. Your case manager is responsible for monitoring your services over time and helping with the redetermination process, which generally happens on an annual cycle. You can ask your case manager to revisit your plan any time your needs change.`,
+},
+{
+  id: 'vt-appeals',
+  title: 'Vermont: how to appeal if services are denied or cut',
+  citation: 'Vermont Human Services Board fair hearing process; Department of Vermont Health Access (DVHA)',
+  text: `If Vermont denies, reduces, or ends your Medicaid or HCBS services, you can ask for a state fair hearing before the Human Services Board, which is independent of the agency that made the decision. Heads up: different official sources describe different appeal windows, some citing 90 days and others 120 days from the date of the notice, so the deadline may depend on which program or notice type applies to you. Check your specific notice for the exact number of days rather than assuming either figure. If you are already getting a service and you ask for a hearing before the date the change is set to take effect, you generally have the right to keep getting that service at the same level while your appeal is pending. You can also get free help with a Medicaid appeal from the Vermont Office of the Health Care Advocate. Do not wait to ask for help if a notice is confusing, since acting before the effective date matters for keeping your services in place during the appeal.`,
+},
+{
+  id: 'vt-complaints-pna',
+  title: 'Vermont: reporting problems and free advocacy help',
+  citation: 'Vermont Adult Protective Services 1-800-564-1612; Disability Rights Vermont 1-800-834-7890',
+  text: `If you or someone you know is being abused, neglected, or exploited, call Vermont Adult Protective Services at 1-800-564-1612. This hotline is run by the state's Division of Licensing and Protection. If someone is in immediate danger, call 911 first. For free legal help protecting your rights, contact Disability Rights Vermont at 1-800-834-7890. They are Vermont's official protection and advocacy organization for people with disabilities, and their services are free. You will not get in trouble for reporting a problem or for asking them for help.`,
+},
+  ], serviceCodes: [] },
+  WI: { name: "Wisconsin", chunks: [
+{
+  id: 'wi-agency-waivers',
+  title: 'Wisconsin: who runs HCBS and the main programs',
+  citation: 'Wisconsin Department of Health Services (DHS); IRIS (Include, Respect, I Self-Direct) and Family Care, both Medicaid HCBS long-term care programs',
+  text: `In Wisconsin, the Department of Health Services runs the state's Medicaid long-term care programs, and people with intellectual and developmental disabilities usually use one of two of them. IRIS, which stands for Include, Respect, I Self-Direct, lets you manage your own budget and hire your own workers with help from an IRIS Consultant Agency. Family Care is a managed care program where a care team, including a nurse and a care manager, arranges services for you. Unlike some states, Wisconsin does not run a separate waiver just for people with intellectual and developmental disabilities. Instead, IRIS and Family Care serve people with developmental disabilities, physical disabilities, and older adults together under the same programs. Your local Aging and Disability Resource Center, called an ADRC, is usually where you start to apply.`,
+},
+{
+  id: 'wi-rights',
+  title: "Wisconsin: your rights as a patient receiving DD services",
+  citation: 'Wisconsin Statutes Section 51.61 ("Patients rights")',
+  text: `Wisconsin has a law that protects the rights of people receiving services for developmental disabilities, mental illness, or drug and alcohol treatment. It is Section 51.61 of the Wisconsin Statutes, often called the patients rights law. Under this law, the state must set up procedures to protect your rights and a grievance process so you can complain if those rights are not honored. You have the right to give informed, written consent before you receive treatment, unless a court has found you unable to consent. If a facility ever needs to use restraint or isolation, the law says it can only be used in an emergency to prevent you from harming yourself or others, and your dignity and safety must be protected. If you think your rights under this law were violated, you can use the grievance procedure through your provider or county, or contact Disability Rights Wisconsin.`,
+},
+{
+  id: 'wi-service-plan',
+  title: 'Wisconsin: your service plan (IRIS support and service plan, or Family Care member-centered plan)',
+  citation: 'Wisconsin DHS IRIS Policy Manual; Family Care and Family Care Partnership program materials',
+  text: `Your service plan in Wisconsin depends on which program you are in. If you are in IRIS, your plan is called a support and service plan, and you build it together with your IRIS consultant, based on your own long-term goals and how you want to reach them. Your IRIS consultant agency reviews the plan to make sure it meets program standards. If you are in Family Care, your plan is called a member-centered plan, and it is created with your interdisciplinary team, which includes a nurse and a care manager, within 60 days of when you enroll. In both programs, your care team or consultant checks in with you regularly, and the plan is meant to be updated whenever your needs or goals change, not just on a fixed yearly schedule. Ask your consultant or care manager about the exact review timeline that applies to you.`,
+},
+{
+  id: 'wi-appeals',
+  title: 'Wisconsin: how to appeal if services are denied or cut',
+  citation: 'Wisconsin Department of Administration, Division of Hearings and Appeals (DHA); Medicaid Eligibility Handbook Section 23.2',
+  text: `If Wisconsin denies, reduces, or ends your Medicaid or long-term care services, you can ask for a state fair hearing through the Division of Hearings and Appeals. Sources reviewed for this pack gave slightly different appeal windows, generally somewhere between 45 and 60 days from the date of the decision, so always check the exact deadline printed on your notice rather than relying on a single number. If you want your current services to keep going while you wait for a decision, you generally need to ask for that within 10 days of getting the notice, or before the change takes effect, whichever is sooner. You can send your written hearing request to the Division of Hearings and Appeals in Madison. A Family Voices of Wisconsin guide and your managed care organization can help you prepare for the hearing.`,
+},
+{
+  id: 'wi-complaints-pna',
+  title: 'Wisconsin: reporting problems and free advocacy help',
+  citation: 'Wisconsin Elder Abuse Hotline 1-833-586-0107; county Adult Protective Services (ADRC); Disability Rights Wisconsin 1-800-928-8778',
+  text: `If you or someone you know age 60 or older is being abused or neglected, you can call the statewide Wisconsin Elder Abuse Hotline at 1-833-586-0107. For adults under 60 who are at risk, Wisconsin handles reports at the county level, so contact your county's Adult Protective Services unit, often based at your local Aging and Disability Resource Center. If it is an emergency, call 911 first. For free legal help with your rights, contact Disability Rights Wisconsin at 1-800-928-8778. They are the official protection and advocacy organization for people with disabilities in Wisconsin, and their help is free. You will not get in trouble for reporting a problem or asking for help.`,
+},
+  ], serviceCodes: [] },
+  MD: { name: "Maryland", chunks: [
+{
+  id: 'md-agency-waivers',
+  title: 'Maryland: who runs HCBS and the main waiver program',
+  citation: 'Maryland Department of Health, Developmental Disabilities Administration (DDA); Community Pathways Waiver (1915(c) HCBS waiver)',
+  text: `In Maryland, the Developmental Disabilities Administration, called the DDA, runs the Medicaid home and community-based waiver for people with intellectual and developmental disabilities. As of October 2025, Maryland combined its older waivers, the Family Supports Waiver, the Community Supports Waiver, and the original Community Pathways Waiver, into one program now simply called Community Pathways. This waiver pays for supports that help you live in your own home or community instead of in an institution. Your day-to-day contact is a Coordinator of Community Services, often shortened to CCS, who helps you apply and stay connected to services. Because this consolidation was recent, ask your CCS or the DDA directly about how your specific services were affected by the change.`,
+},
+{
+  id: 'md-rights',
+  title: 'Maryland: your legal rights as a person with a developmental disability',
+  citation: 'Maryland Health-General Article, Title 7 ("Developmental Disabilities Law"), Subtitle 10 ("Rights of Individuals"), including Section 7-1002',
+  text: `Maryland has a law that protects the rights of people with developmental disabilities who get services through licensed programs. It is Subtitle 10 of Title 7 of the Health-General Article, called "Rights of Individuals." Under this law, you have the right to be free from physical restraints except for very limited, minimal restraints that are written down and authorized. You also have the right to be told about the most integrated service settings available, meaning you should be offered options that let you live and receive services in your community rather than in a more restrictive setting. If you believe your rights under this law have been violated, you can raise it with your provider, your DDA regional office, or Disability Rights Maryland.`,
+},
+{
+  id: 'md-service-plan',
+  title: 'Maryland: your service plan (the Person-Centered Plan)',
+  citation: 'Maryland DDA Person-Centered Planning (PCP) Development and Authorization Manual',
+  text: `In Maryland, your main plan is called a Person-Centered Plan, or PCP. It is a written plan that you direct, built together with your team, which includes your Coordinator of Community Services and anyone else you choose to involve, like family, friends, or a provider. The PCP describes your goals and the services you need to reach them, and it must be reviewed and resubmitted to the DDA every year to keep or request services. Pre-planning for your annual PCP should start within 90 days of your plan's anniversary date, and DDA expects the whole process, from your team meeting to the final signed plan, to wrap up within about 15 business days. You can also ask your team to revisit your plan sooner if your needs change during the year.`,
+},
+{
+  id: 'md-appeals',
+  title: 'Maryland: how to appeal if services are denied or cut',
+  citation: 'Maryland Department of Health Medicaid fair hearing process; Office of Administrative Hearings',
+  text: `If Maryland denies, reduces, or ends your Medicaid or HCBS services, you have the right to a fair hearing through the state Office of Administrative Hearings. In general, you have 90 days from the date on your notice to request a hearing. Here is an important detail: if you want your current services to keep going while you wait for a decision, you usually need to ask for the hearing within 10 calendar days of the date on your notice, the postmark, or the effective date of the change, whichever is later. If you get your care through a Medicaid managed care plan, you typically have to complete that plan's own internal appeal first, usually within 60 days, before you can ask for a state fair hearing. Always check the notice you received, because it lists your exact deadlines. Disability Rights Maryland has published guides on preparing for a Medicaid appeal and can help.`,
+},
+{
+  id: 'md-complaints-pna',
+  title: 'Maryland: reporting problems and free advocacy help',
+  citation: 'Maryland Adult Protective Services 1-800-91Prevent (1-800-917-7383); Disability Rights Maryland 410-727-6352 or 1-800-233-7201',
+  text: `If you or someone you know is being abused or neglected, you can report it to Maryland Adult Protective Services by calling 1-800-91Prevent, which is 1-800-917-7383, or by contacting your local Department of Social Services office. If it is an emergency, call 911 first. For free legal help with your rights, contact Disability Rights Maryland at 410-727-6352, or toll free at 1-800-233-7201. TTY users can call 410-235-5387. Disability Rights Maryland is the official protection and advocacy organization for Marylanders with disabilities, and their help is free. You will not get in trouble for reporting a problem or asking for help.`,
+},
+  ], serviceCodes: [] },
+  MN: { name: "Minnesota", chunks: [
+{
+  id: 'mn-agency-waivers',
+  title: 'Minnesota: who runs HCBS and the main waiver programs',
+  citation: 'Minnesota Department of Human Services (DHS); Developmental Disabilities (DD) waiver and Community Access for Disability Inclusion (CADI) waiver, both 1915(c) HCBS waivers',
+  text: `In Minnesota, the Department of Human Services, often called DHS, runs the Medicaid home and community-based waivers for people with disabilities. Minnesota has four main waivers: Developmental Disabilities (DD), Community Access for Disability Inclusion (CADI), Brain Injury (BI), and Community Alternative Care (CAC). People with intellectual and developmental disabilities most often use the DD waiver or the CADI waiver, and these pay for services so you can live in your own home, a family home, or a small community setting instead of an institution. You apply through your county or Tribal agency, and a case manager there is your main point of contact. Ask your county agency which waiver fits your situation, since eligibility rules differ between them.`,
+},
+{
+  id: 'mn-rights',
+  title: "Minnesota: your rights when receiving care in a licensed facility or program",
+  citation: 'Minnesota Statutes Section 144.651 ("Health Care Bill of Rights")',
+  text: `Minnesota law protects people who receive care in health care facilities and licensed residential programs, including many settings that serve people with developmental disabilities. This is Minnesota Statutes Section 144.651, sometimes called the Patients and Residents Bill of Rights. Under this law, no facility can make you give up these rights just to be admitted. You have the right to talk and write privately with people you choose, get your mail unopened, and use a phone for private calls. If you are able to manage your own money, you have the right to do so, or to get at least a quarterly accounting if someone else manages it for you. This research did not confirm a separate, DD-specific bill of rights statute beyond Section 144.651, so if your services happen outside a licensed facility, ask your case manager what specific rights protections apply to your exact program.`,
+},
+{
+  id: 'mn-service-plan',
+  title: 'Minnesota: your service plan (the MnCHOICES Support Plan)',
+  citation: 'Minnesota DHS MnCHOICES Support Plan process',
+  text: `In Minnesota, your main plan is now called the MnCHOICES Support Plan. It replaced an older set of documents called the Community Support Plan and the Coordinated Service and Support Plan, which DHS retired around October 2024 as part of an update to its MnCHOICES computer system. Your county or Tribal case manager builds this plan with you, based on an assessment of your needs and your own goals, and it lists the services and supports you will get. If you are on the DD, CADI, BI, or CAC waiver, your case manager must have at least two face-to-face visits with you every 12 months, and your annual assessment can count as one of those visits. Because this system changed recently, ask your case manager to confirm the current name and paperwork for your specific plan.`,
+},
+{
+  id: 'mn-appeals',
+  title: 'Minnesota: how to appeal if services are denied or cut',
+  citation: 'Minnesota DHS State Appeals Office; Minnesota Statutes Section 256.045',
+  text: `If Minnesota denies, reduces, or ends your Medicaid or HCBS services, you have the right to appeal to the DHS State Appeals Office for a hearing. In general, you must file your appeal within 30 days of the notice, though DHS can accept it up to 90 days later if you show good cause for the delay. If your notice gave you at least 10 days advance warning and you file your appeal by the date the change was set to take effect, your services usually continue automatically while your appeal is decided. Always check the notice you received, since it lists your exact deadline and appeal instructions. The Arc Minnesota and Minnesota Disability Law Center have published guides that can help you prepare.`,
+},
+{
+  id: 'mn-complaints-pna',
+  title: 'Minnesota: reporting problems and free advocacy help',
+  citation: 'Minnesota Adult Abuse Reporting Center (MAARC) 1-844-880-1574; Minnesota Disability Law Center 1-800-292-4150',
+  text: `If you or someone you know is being abused or neglected, call the Minnesota Adult Abuse Reporting Center, known as MAARC, at 1-844-880-1574. It is open 24 hours a day, every day, and your identity as the reporter stays confidential. If it is an emergency, call 911 first for police, fire, or ambulance help. For free legal help with your rights, contact the Minnesota Disability Law Center at 1-800-292-4150. They are part of Mid-Minnesota Legal Aid and are the official protection and advocacy organization for people with disabilities in Minnesota, and their help is free. You will not get in trouble for reporting a problem or asking for help.`,
+},
+  ], serviceCodes: [] },
+  ME: { name: "Maine", chunks: [
+{
+  id: 'me-agency-waivers',
+  title: 'Maine: who runs HCBS and the main waiver programs',
+  citation: 'Maine Department of Health and Human Services (DHHS), Office of Aging and Disability Services (OADS); MaineCare Sections 21 and 29 waivers',
+  text: `In Maine, the Department of Health and Human Services runs Medicaid waiver services for people with intellectual disabilities or autism through its Office of Aging and Disability Services, called OADS. The two main waivers are known by their MaineCare Benefits Manual section numbers. Section 21 is the fuller waiver, called Home and Community Benefits for Members with Intellectual Disabilities or Autism Spectrum Disorder, and it pays for supports like home support, community support, work support, and career planning. Section 29 is a more limited community support waiver. Both help you live in your own home or community instead of an institution. A Case Manager helps you understand what services are available, apply for MaineCare and the waiver, and connect you to supports. You can reach OADS about waiver services by emailing HCBS.Waiver@maine.gov.`,
+},
+{
+  id: 'me-rights',
+  title: 'Maine: your legal rights as a person with an intellectual disability or autism',
+  citation: 'Maine Revised Statutes Title 34-B, Section 5605 (Rights and basic protections of a person with an intellectual disability, autism or an acquired brain injury)',
+  text: `Maine has a law, Title 34-B Section 5605, that lists your rights if you have an intellectual disability, autism, or an acquired brain injury. You have the right to dignity, privacy, and humane treatment, and to practice your religion freely. You cannot be punished with corporal punishment, seclusion, or language meant to humiliate or degrade you, and you are protected from unnecessary physical restraints. You have the right to send and receive sealed mail without anyone reading or holding it, to have visitors during reasonable hours, and to use the phone or internet to stay connected. You have the right to prompt medical and dental care, nutritious food, and to give informed consent before any experimental treatment. You keep the right to vote, to keep your own clothes and belongings, and to be fairly paid if you work. This law was significantly updated effective April 1, 2026, so ask OADS or Disability Rights Maine for the most current version.`,
+},
+{
+  id: 'me-service-plan',
+  title: 'Maine: your service plan (the Person-Centered Service Plan)',
+  citation: 'MaineCare Benefits Manual Section 21 Personal Plan requirements (Code of Maine Rules 144-101 II 21.04); OADS person-centered planning standards',
+  text: `In Maine, your plan under the Section 21 or Section 29 waiver is called a Person-Centered Service Plan. Your Case Manager works with you and the people you choose to build a plan based on your own goals, needs, and preferences, not a generic template. Your plan must be reviewed, revised, and updated at least once a year, based on the date your plan took effect. It can also be updated any time you or your guardian asks, or when something important changes, like your physical, social, behavioral, medical, or communication needs, or when you have made real progress toward a goal. This means you always have a say in adjusting your plan, not just once a year.`,
+},
+{
+  id: 'me-appeals',
+  title: 'Maine: how to appeal if services are denied or cut',
+  citation: 'MaineCare Division of Administrative Hearings fair hearing process',
+  text: `If Maine denies, reduces, or ends your MaineCare services, you have the right to a fair hearing through the DHHS Division of Administrative Hearings. In general, you need to appeal within 30 days of a denial, and if your services are being reduced or ended, you can ask for a hearing within 60 days of the date on your letter. Here is the important part: if you ask for the hearing within 10 to 15 days of the date on your letter, your current services can keep going while you wait for a decision, so act as quickly as you can and check your notice for the exact number of days you have. If you win your appeal, you should get back any benefits you missed. You can call 1-855-797-4357 to ask about starting an appeal, or contact your local DHHS office.`,
+},
+{
+  id: 'me-complaints-pna',
+  title: 'Maine: reporting problems and free advocacy help',
+  citation: 'Maine Adult Protective Services 24-hour hotline 1-800-624-8404; Disability Rights Maine 1-800-452-1948',
+  text: `If you or someone you know, age 18 or older, is being abused, neglected, or exploited, you can report it to Maine Adult Protective Services by calling 1-800-624-8404. This line is toll-free and open 24 hours a day, and you can call anonymously. If it is a life-threatening emergency, call 911 first. For free legal help protecting your rights, contact Disability Rights Maine, the state's official protection and advocacy organization, at 1-800-452-1948, which is also a TTY line, or their Augusta office at 207-626-2774. Reporting a problem or asking for help does not cost anything, and you will not get in trouble for speaking up.`,
+},
+  ], serviceCodes: [] },
 }
 
 // All US states + DC, for the state chooser. `covered` is derived from STATES.
