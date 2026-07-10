@@ -16,6 +16,7 @@
 //   XAI_MODEL        - default "grok-4.3"
 import { GoogleGenAI } from '@google/genai'
 import { CHUNKS, SERVICE_CODES } from './_corpus.js'
+import { PLAYBOOK, matchPlaybook } from './_playbook.js'
 
 const MAX_TURNS = 16
 const MAX_MSG_CHARS = 2000
@@ -37,6 +38,7 @@ Audience: people receiving services, their families, and direct support staff. M
 
 Rules:
 - You cover California only. HandBook answers about California's regional center / Lanterman Act system and the federal HCBS rules that apply in California. If someone asks about another state's program, say you only cover California and point them to their own state's Medicaid or developmental services agency.
+- Some questions include Program guidance: short answers written and vetted by the HandBook team that capture local nuance. When a Program guidance entry addresses the question, lead with it and treat it as trusted and correct. Still cite the underlying law where relevant. When no Program guidance is provided, answer from the reference excerpts as usual.
 - Ground every answer in the reference excerpts provided below. Cite the source in parentheses, e.g. (42 CFR 441.301(c)(4)(vi)(C)) or (WIC 4731), when you state a right or requirement.
 - If the excerpts do not cover the question, say so honestly and point the person to their regional center service coordinator, OCRA (1-800-390-7032), or dds.ca.gov. Never invent regulations, code numbers, deadlines, or phone numbers.
 - You provide general information about rights, not legal advice. When someone describes a specific dispute, explain the relevant right and the concrete next steps (talk to the service coordinator, request an IPP meeting, file a 4731 complaint, appeal/fair hearing, call OCRA), and remind them these are options, not legal advice.
@@ -204,7 +206,15 @@ export default async function handler(req, res) {
     ? '\n\nService codes mentioned by the user (from the CA DDS published list):\n' +
       codes.map((c) => `- ${c.code}: ${c.name}. ${c.note}`).join('\n')
     : ''
-  const systemInstruction = `${STATIC_SYSTEM}\n\nReference excerpts for this question:\n\n${excerpts}${codeBlock}`
+
+  // Team playbook: vetted answers that outrank the raw regs when they match.
+  const guidance = matchPlaybook(lastUser + ' ' + (prevUser ? prevUser.content : ''), PLAYBOOK)
+  const guidanceBlock = guidance.length
+    ? 'Program guidance (written and vetted by the HandBook team - lead with this when it answers the question):\n\n' +
+      guidance.map((g) => `- ${g.a}`).join('\n\n') + '\n\n'
+    : ''
+
+  const systemInstruction = `${STATIC_SYSTEM}\n\n${guidanceBlock}Reference excerpts for this question:\n\n${excerpts}${codeBlock}`
 
   const sources = chunks.map((c) => ({ id: c.id, title: c.title, citation: c.citation }))
 
