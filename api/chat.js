@@ -108,6 +108,10 @@ export default async function handler(req, res) {
       config: {
         systemInstruction: `${STATIC_SYSTEM}\n\nReference excerpts for this question:\n\n${excerpts}${codeBlock}`,
         maxOutputTokens: 1024,
+        // Flash defaults to spending part of maxOutputTokens on hidden
+        // reasoning before writing the visible reply, which was truncating
+        // answers. This isn't a reasoning task, so turn it off.
+        thinkingConfig: { thinkingBudget: 0 },
       },
     })
     const reply = response.text || ''
