@@ -10,16 +10,21 @@ const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
 const STORE_KEY = 'handbook.conversations.v1'
 const MAX_CONVERSATIONS = 50
 
+// Professional, neutral palette (greige + teal) - distinct from the warm cream
+// of the other Book apps.
 const C = {
-  bg: '#FAF6EE',
-  card: '#FFFDF8',
-  ink: '#2E2A24',
-  sub: '#6F6659',
-  line: '#E7DFD0',
-  accent: '#8B5E3C',
-  accentSoft: '#F1E7DA',
-  green: '#4C7A5C',
+  bg: '#F4F3F1',
+  card: '#FFFFFF',
+  ink: '#2B2A28',
+  sub: '#6E6A64',
+  line: '#E5E2DC',
+  accent: '#2E7D74',
+  accentSoft: '#E4EEEC',
 }
+
+// Bottom clearance so scrolled content / the composer never hides behind the
+// floating glass nav pill.
+const NAV_CLEARANCE = 'calc(env(safe-area-inset-bottom) + 78px)'
 
 const STARTERS = [
   'Can my group home lock the fridge?',
@@ -107,7 +112,6 @@ export default function App() {
       return true
     } catch (e) {
       setError(e.message || 'Something went wrong. Please try again.')
-      // Roll the failed question back out; drop the conversation if it was new/empty.
       setConversations((prev) =>
         prev.map((c) => (c.id === convId ? { ...c, messages: base } : c)).filter((c) => c.messages.length > 0)
       )
@@ -137,52 +141,69 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100dvh', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: 'flex', flexDirection: 'column' }}>
-      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100dvh' }}>
-        <Header tab={tab} setTab={setTab} onAsk={startNew} />
+    // Fixed full-viewport shell (Book-app recipe) - this is what keeps the page
+    // itself static; only the inner scroll areas move.
+    <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
+      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        <Header />
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} />}
         {tab === 'history' && <History conversations={conversations} onOpen={openConversation} onDelete={deleteConversation} />}
         {tab === 'library' && <Library />}
+      </div>
+      <Nav tab={tab} setTab={setTab} onAsk={startNew} />
+    </div>
+  )
+}
+
+function Header() {
+  return (
+    <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0', flexShrink: 0 }}>
+      <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: 0.2 }}>HandBook</div>
+      <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>Your HCBS rights, in plain language</div>
+      <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '8px 12px', margin: '12px 0 0', lineHeight: 1.45 }}>
+        General information, not legal advice. Your saved history stays on this device only. Please don't include names or other personal details.
       </div>
     </div>
   )
 }
 
-function Header({ tab, setTab, onAsk }) {
-  const tabs = [
+function Nav({ tab, setTab, onAsk }) {
+  const items = [
     { key: 'chat', label: 'Ask', onClick: onAsk },
     { key: 'history', label: 'History', onClick: () => setTab('history') },
     { key: 'library', label: 'Rights', onClick: () => setTab('library') },
   ]
   return (
-    <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: 0.2 }}>HandBook</div>
-          <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>Your HCBS rights, in plain language</div>
-        </div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-          {tabs.map((t) => {
-            const active = tab === t.key
-            return (
-              <button
-                key={t.key}
-                onClick={t.onClick}
-                style={{
-                  border: `1px solid ${active ? C.accent : C.line}`,
-                  background: active ? C.accentSoft : 'transparent',
-                  color: active ? C.accent : C.sub,
-                  borderRadius: 999, padding: '7px 13px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                }}
-              >
-                {t.label}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-      <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '8px 12px', margin: '12px 0 0', lineHeight: 1.45 }}>
-        General information, not legal advice. Your saved history stays on this device only. Please don't include names or other personal details.
+    <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'max(env(safe-area-inset-bottom), 12px)', display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
+      <div
+        style={{
+          pointerEvents: 'auto',
+          display: 'flex', gap: 4, padding: 5,
+          background: 'rgba(255,255,255,0.72)',
+          backdropFilter: 'blur(14px) saturate(1.3)',
+          WebkitBackdropFilter: 'blur(14px) saturate(1.3)',
+          border: '1px solid rgba(43,42,40,0.08)',
+          borderRadius: 999,
+          boxShadow: '0 8px 28px rgba(43,42,40,0.16)',
+        }}
+      >
+        {items.map((it) => {
+          const active = tab === it.key
+          return (
+            <button
+              key={it.key}
+              onClick={it.onClick}
+              style={{
+                border: 'none',
+                background: active ? C.accent : 'transparent',
+                color: active ? '#fff' : C.sub,
+                borderRadius: 999, padding: '9px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              {it.label}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -205,21 +226,16 @@ function Chat({ messages, activeId, busy, error, onSend }) {
     const last = messages[messages.length - 1]
 
     if (switched) {
-      // Opened a different (or brand-new) conversation - start at the top.
       el.scrollTop = 0
     } else if (!last) {
       el.scrollTop = 0
     } else if (last.role === 'user') {
-      // Just asked - keep the question + "looking that up" pinned at the bottom.
       el.scrollTop = el.scrollHeight
     } else if (last.role === 'assistant' && messages.length === prevLen + 1 && lastMsgRef.current) {
-      // A fresh answer arrived - bring its START to the top so the reader
-      // scrolls down through it naturally.
       const cTop = el.getBoundingClientRect().top
       const mTop = lastMsgRef.current.getBoundingClientRect().top
       el.scrollTop += mTop - cTop - 12
     }
-    // Any other case (e.g. an error rolled a question back): leave scroll as-is.
   }, [messages, busy, activeId])
 
   async function submit(text) {
@@ -231,7 +247,7 @@ function Chat({ messages, activeId, busy, error, onSend }) {
 
   return (
     <>
-      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 16px 8px', WebkitOverflowScrolling: 'touch' }}>
+      <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '16px 16px 8px', WebkitOverflowScrolling: 'touch' }}>
         {messages.length === 0 && (
           <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: 14, color: C.sub, marginBottom: 10 }}>Try asking:</div>
@@ -249,10 +265,10 @@ function Chat({ messages, activeId, busy, error, onSend }) {
         ))}
         <div style={{ minHeight: 26, padding: '2px 4px' }}>
           {busy && <span style={{ fontSize: 13, color: C.sub }}>Looking that up…</span>}
-          {!busy && error && <span style={{ fontSize: 13, color: '#A0522D' }}>{error}</span>}
+          {!busy && error && <span style={{ fontSize: 13, color: '#B4552F' }}>{error}</span>}
         </div>
       </div>
-      <div style={{ padding: '8px 16px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${C.line}`, background: C.bg }}>
+      <div style={{ padding: `8px 16px ${NAV_CLEARANCE}`, borderTop: `1px solid ${C.line}`, background: C.bg, flexShrink: 0 }}>
         <form
           onSubmit={(e) => { e.preventDefault(); submit(input) }}
           style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}
@@ -362,7 +378,7 @@ function TrashIcon() {
 
 function History({ conversations, onOpen, onDelete }) {
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 16px calc(env(safe-area-inset-bottom) + 24px)', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
       <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>Saved questions</div>
       {conversations.length === 0 ? (
         <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
@@ -404,7 +420,7 @@ function History({ conversations, onOpen, onDelete }) {
 function Library() {
   const [open, setOpen] = useState(null)
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 16px calc(env(safe-area-inset-bottom) + 24px)', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
       <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>Your rights</div>
       {CHUNKS.map((c) => {
         const isOpen = open === c.id
