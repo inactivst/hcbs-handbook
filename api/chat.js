@@ -112,6 +112,7 @@ export default async function handler(req, res) {
       sources: chunks.map((c) => ({ id: c.id, title: c.title, citation: c.citation })),
     })
   } catch (err) {
+    console.error('HandBook chat error:', err?.message || err, err?.status, err?.response?.status)
     const status = err?.status ?? err?.response?.status
     res.status(status === 429 ? 429 : 500).json({
       error:
