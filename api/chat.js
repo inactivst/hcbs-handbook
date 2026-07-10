@@ -22,10 +22,14 @@ const MAX_TURNS = 16
 const MAX_MSG_CHARS = 2000
 const MAX_OUTPUT_TOKENS = 1024
 
-// Gemini alias, not a pinned version - Google hot-swaps this to the current
-// flash model with a 2-week deprecation notice, so it won't 404 when a dated
-// version (e.g. gemini-2.5-flash) is retired.
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest'
+// Pin gemini-2.5-flash for its FREE-TIER quota. The `gemini-flash-latest`
+// alias now resolves to gemini-3.5-flash, whose free tier is only 20 requests
+// per DAY (confirmed in Vercel runtime logs), which is what surfaced as
+// "HandBook is busy". Pinned gemini-2.5-flash gets 1,500 requests/day free.
+// Tradeoff: a pinned model can eventually be retired (404); if that happens,
+// set GEMINI_MODEL to the current free flash model (or gemini-2.5-flash-lite,
+// which has double the per-minute limit).
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 // xAI model id (literal, dot notation). grok-4.3 is xAI's current general
 // chat model; override via XAI_MODEL if they retire it.
 const GROK_MODEL = process.env.XAI_MODEL || 'grok-4.3'
