@@ -75,10 +75,22 @@ function Chat() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const scrollRef = useRef(null)
+  const lastMsgRef = useRef(null)
 
   useEffect(() => {
     const el = scrollRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (!el) return
+    const last = messages[messages.length - 1]
+    // When an answer arrives, bring the START of the answer to the top so the
+    // reader scrolls down through it naturally. For the reader's own message
+    // (or the "looking that up" state), keep the newest content at the bottom.
+    if (last && last.role === 'assistant' && lastMsgRef.current) {
+      const cTop = el.getBoundingClientRect().top
+      const mTop = lastMsgRef.current.getBoundingClientRect().top
+      el.scrollTop += mTop - cTop - 12
+    } else {
+      el.scrollTop = el.scrollHeight
+    }
   }, [messages, busy])
 
   async function send(text) {
@@ -123,7 +135,7 @@ function Chat() {
           </div>
         )}
         {messages.map((m, i) => (
-          <Bubble key={i} m={m} />
+          <Bubble key={i} m={m} ref={i === messages.length - 1 ? lastMsgRef : null} />
         ))}
         <div style={{ minHeight: 26, padding: '2px 4px' }}>
           {busy && <span style={{ fontSize: 13, color: C.sub }}>Looking that up…</span>}
@@ -194,10 +206,10 @@ function renderContent(text) {
   })
 }
 
-function Bubble({ m }) {
+const Bubble = React.forwardRef(function Bubble({ m }, ref) {
   const user = m.role === 'user'
   return (
-    <div style={{ display: 'flex', justifyContent: user ? 'flex-end' : 'flex-start', margin: '10px 0' }}>
+    <div ref={ref} style={{ display: 'flex', justifyContent: user ? 'flex-end' : 'flex-start', margin: '10px 0' }}>
       <div style={{ maxWidth: '88%' }}>
         <div
           style={{
@@ -224,7 +236,7 @@ function Bubble({ m }) {
       </div>
     </div>
   )
-}
+})
 
 function Library() {
   const [open, setOpen] = useState(null)
