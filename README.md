@@ -5,9 +5,11 @@ Plain-language chat guide to HCBS (Home and Community-Based Services) rights, fo
 **Models:** multiple providers with automatic failover. The primary answers each request; if it errors or is rate-limited (HTTP 429), the endpoint falls over to the next provider, so a throttled free tier no longer surfaces "HandBook is busy". Each provider only joins the chain when its key is set.
 
 - **Groq** (`GROQ_API_KEY`) is the recommended **free** primary: the inference company Groq (with a Q), NOT xAI's Grok. Free tier, no credit card, ~1,000 req/day on `llama-3.3-70b-versatile` (set `GROQ_MODEL=llama-3.1-8b-instant` for 14,400/day). Key at console.groq.com.
+- **Cerebras** (`CEREBRAS_API_KEY`) is the **free** deep fallback: no card, 1M tokens/day but only 5 req/min - it backstops volume, never leads. `CEREBRAS_MODEL` default `gpt-oss-120b`. Key at cloud.cerebras.ai.
 - **Gemini** (`GEMINI_API_KEY`) is a weak free fallback: for a new project `gemini-flash-latest` resolves to `gemini-3.5-flash` at only 20 req/day, and `gemini-2.5-flash` 404s ("not available to new users"). Do not rely on it.
 - **Grok** (`XAI_API_KEY`, `XAI_MODEL` default `grok-4.3`) is xAI's paid model; needs credits on the xAI team.
-- `PROVIDER_ORDER` (default `groq,gemini,grok`) sets the failover order.
+- `PROVIDER_ORDER` (default `groq,cerebras,gemini,grok`) sets the failover order.
+- Not used, deliberately: OpenAI (no real free API tier - the free path requires sharing prompts for training), GitHub Models/Copilot (prototyping-only and retiring 2026-07-30), Mistral free tier (trains on API data by default), OpenRouter free models (50 req/day and provider-dependent data policies).
 
 The app was originally built and tested on `claude-opus-4-8` / `claude-haiku-4-5` via the Anthropic API; Claude can be dropped into the same provider map in `api/chat.js` (re-add `@anthropic-ai/sdk` and add a `callClaude` alongside the others).
 

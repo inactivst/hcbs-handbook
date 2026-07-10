@@ -10,12 +10,14 @@
 // chain when its key is set, so the app runs on whatever keys exist.
 //   GROQ_API_KEY     - Groq (the inference company, NOT xAI's Grok) - FREE tier,
 //                      no card, ~1,000 req/day on llama-3.3-70b. The free path.
+//   CEREBRAS_API_KEY - Cerebras - FREE tier, no card, 1M tokens/day (only 5
+//                      req/min, so it's the deep fallback, not the primary).
 //   GEMINI_API_KEY   - Google AI Studio key. Free tier for this project is tiny
 //                      (gemini-flash-latest resolves to gemini-3.5-flash = 20/day;
 //                      gemini-2.5-flash 404s for new projects). Weak fallback.
 //   XAI_API_KEY      - xAI's Grok (paid, needs credits on the xAI team).
-//   PROVIDER_ORDER   - comma list, default "groq,gemini,grok".
-//   GROQ_MODEL / GEMINI_MODEL / XAI_MODEL - per-provider model overrides.
+//   PROVIDER_ORDER   - comma list, default "groq,cerebras,gemini,grok".
+//   GROQ_MODEL / CEREBRAS_MODEL / GEMINI_MODEL / XAI_MODEL - model overrides.
 // NOTE the Groq (GROQ_API_KEY, free) vs Grok (XAI_API_KEY, paid) name collision.
 import { GoogleGenAI } from '@google/genai'
 import { getStateContent } from './_corpus.js'
@@ -30,6 +32,12 @@ const MAX_OUTPUT_TOKENS = 1024
 // 14,400/day if you need more volume and can accept a smaller model.
 const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+// Cerebras (free) - OpenAI-compatible. Free tier: 1M tokens/DAY but only 5
+// req/MIN, so it backstops volume, never leads. gpt-oss-120b is the strongest
+// free-tier model there (docs.cerebras.ai lists gpt-oss-120b / zai-glm-4.7 /
+// gemma-4-31b); override via CEREBRAS_MODEL when they rotate.
+const CEREBRAS_MODEL = process.env.CEREBRAS_MODEL || 'gpt-oss-120b'
+const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions'
 // Gemini: gemini-flash-latest resolves to gemini-3.5-flash (20/day free for a
 // new project). gemini-2.5-flash 404s ("not available to new users"), verified
 // live, so do NOT pin it. Weak but free fallback.
@@ -181,14 +189,22 @@ function callGrok({ systemInstruction, messages }) {
   })
 }
 
+function callCerebras({ systemInstruction, messages }) {
+  return callOpenAICompatible({
+    label: 'Cerebras', url: CEREBRAS_URL, apiKey: process.env.CEREBRAS_API_KEY,
+    model: CEREBRAS_MODEL, systemInstruction, messages,
+  })
+}
+
 const PROVIDERS = {
   groq: { call: callGroq, available: () => !!process.env.GROQ_API_KEY },
+  cerebras: { call: callCerebras, available: () => !!process.env.CEREBRAS_API_KEY },
   gemini: { call: callGemini, available: () => !!process.env.GEMINI_API_KEY },
   grok: { call: callGrok, available: () => !!process.env.XAI_API_KEY },
 }
 
 function providerOrder() {
-  const raw = (process.env.PROVIDER_ORDER || 'groq,gemini,grok')
+  const raw = (process.env.PROVIDER_ORDER || 'groq,cerebras,gemini,grok')
     .split(',')
     .map((s) => s.trim().toLowerCase())
   return raw.filter((name) => PROVIDERS[name] && PROVIDERS[name].available())
