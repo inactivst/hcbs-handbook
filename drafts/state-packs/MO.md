@@ -26,7 +26,7 @@ chunks:
 {
   id: 'mo-rights',
   title: 'Missouri: rights of people receiving DD services',
-  citation: 'Missouri Revised Statutes Chapter 630 ("Department of Mental Health"), Patient's Rights sections including Section 630.140',
+  citation: "Missouri Revised Statutes Chapter 630 (Department of Mental Health), Patients' Rights sections including Section 630.140",
   text: `Missouri law protects people who receive services from the Department of Mental Health, including people with developmental disabilities. Chapter 630 of the Missouri Revised Statutes has a section on patient rights and also makes your treatment records confidential except in specific situations spelled out in the law. The chapter includes rules the state must follow to keep facilities and day programs safe, humane, and adequate, and it sets out reporting duties when someone is abused, neglected, or mistreated. If you think your rights under this law were violated, you can raise it with your provider, your Regional Office, or the Department of Mental Health directly. Because the exact list of enumerated patient rights sits in state regulations tied to this chapter rather than in one single easy-to-quote sentence, ask your Regional Office for the specific rights notice that applies to your services.`,
 },
 {

@@ -21,7 +21,7 @@ chunks:
 {
   id: 'nc-rights',
   title: 'North Carolina: your rights under state law',
-  citation: 'N.C. Gen. Stat. Chapter 122C, Article 3 (Clients' Rights), ncleg.gov',
+  citation: "N.C. Gen. Stat. Chapter 122C, Article 3 (Clients' Rights), ncleg.gov",
   text: `North Carolina law spells out your rights when you get services for a developmental disability, mental health, or substance use. The law is Chapter 122C, Article 3 of the North Carolina General Statutes, often called the Clients' Rights law. It says the state must protect your basic human rights, including dignity, privacy, humane care, and freedom from abuse, neglect, and exploitation (Section 122C-51). Your personal information must be kept private (Section 122C-52). You have the right to an individual written treatment plan and to say no to treatment in most cases (Section 122C-57). If you live in a 24-hour facility, you also have rights to visitors, phone calls, mail, your own belongings, and time outdoors. Staff who see abuse are required by law to report it.`,
 },
 {
