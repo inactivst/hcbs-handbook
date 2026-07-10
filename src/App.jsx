@@ -158,6 +158,42 @@ function Chat() {
   )
 }
 
+// Safety net for stray markdown (**bold**, "- "/"* " bullets) in case the
+// model doesn't follow the plain-text instruction in the system prompt.
+function renderInline(text, keyPrefix) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={`${keyPrefix}-${i}`}>{part.slice(2, -2)}</strong>
+      : <React.Fragment key={`${keyPrefix}-${i}`}>{part}</React.Fragment>
+  )
+}
+
+function renderContent(text) {
+  return text.split(/\n\s*\n/).map((block, bi) => {
+    const lines = block.split('\n').filter((l) => l.trim().length > 0)
+    const isList = lines.length > 0 && lines.every((l) => /^[-*]\s+/.test(l.trim()))
+    if (isList) {
+      return (
+        <ul key={bi} style={{ margin: bi === 0 ? '0 0 0 20px' : '10px 0 0 20px', padding: 0 }}>
+          {lines.map((l, li) => (
+            <li key={li} style={{ marginBottom: 4 }}>{renderInline(l.trim().replace(/^[-*]\s+/, ''), `${bi}-${li}`)}</li>
+          ))}
+        </ul>
+      )
+    }
+    return (
+      <p key={bi} style={{ margin: bi === 0 ? 0 : '10px 0 0' }}>
+        {lines.map((l, li) => (
+          <React.Fragment key={li}>
+            {li > 0 && <br />}
+            {renderInline(l, `${bi}-${li}`)}
+          </React.Fragment>
+        ))}
+      </p>
+    )
+  })
+}
+
 function Bubble({ m }) {
   const user = m.role === 'user'
   return (
@@ -171,10 +207,10 @@ function Bubble({ m }) {
             borderRadius: 16,
             borderBottomRightRadius: user ? 5 : 16,
             borderBottomLeftRadius: user ? 16 : 5,
-            padding: '11px 14px', fontSize: 15, lineHeight: 1.55, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+            padding: '11px 14px', fontSize: 15, lineHeight: 1.55, wordBreak: 'break-word',
           }}
         >
-          {m.content}
+          {user ? <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span> : renderContent(m.content)}
         </div>
         {!user && m.sources && m.sources.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
