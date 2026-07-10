@@ -4,6 +4,12 @@ import { CHUNKS, SERVICE_CODES } from '../api/_corpus.js'
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
 
+// History lives ONLY in the browser's localStorage on this device - never sent
+// to a server, never shared. Keeps the privacy posture: the app stores nothing
+// server-side. Capped so storage can't grow without bound (code-for-scale).
+const STORE_KEY = 'handbook.conversations.v1'
+const MAX_CONVERSATIONS = 50
+
 const C = {
   bg: '#FAF6EE',
   card: '#FFFDF8',
@@ -25,81 +31,68 @@ const STARTERS = [
 
 const serif = "Georgia, 'Times New Roman', serif"
 
+function loadConversations() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(STORE_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function genId() {
+  try {
+    return crypto.randomUUID()
+  } catch {
+    return `c-${Date.now()}-${Math.floor(Math.random() * 1e6)}`
+  }
+}
+
+function timeAgo(ms) {
+  const s = Math.floor((Date.now() - ms) / 1000)
+  if (s < 60) return 'Just now'
+  const m = Math.floor(s / 60)
+  if (m < 60) return `${m} min ago`
+  const h = Math.floor(m / 60)
+  if (h < 24) return `${h} hr ago`
+  const d = Math.floor(h / 24)
+  if (d < 7) return `${d} day${d > 1 ? 's' : ''} ago`
+  return new Date(ms).toLocaleDateString()
+}
+
 export default function App() {
   const [tab, setTab] = useState('chat')
-  return (
-    <div style={{ minHeight: '100dvh', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: 'flex', flexDirection: 'column' }}>
-      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100dvh' }}>
-        <Header tab={tab} setTab={setTab} />
-        {tab === 'chat' ? <Chat /> : <Library />}
-      </div>
-    </div>
-  )
-}
-
-function Header({ tab, setTab }) {
-  return (
-    <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: 0.2 }}>HandBook</div>
-          <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>Your HCBS rights, in plain language</div>
-        </div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[['chat', 'Ask'], ['library', 'Rights Library']].map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setTab(key)}
-              style={{
-                border: `1px solid ${tab === key ? C.accent : C.line}`,
-                background: tab === key ? C.accentSoft : 'transparent',
-                color: tab === key ? C.accent : C.sub,
-                borderRadius: 999, padding: '7px 13px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '8px 12px', margin: '12px 0 0', lineHeight: 1.45 }}>
-        General information, not legal advice. Nothing you type here is saved. Please don't include names or other personal details.
-      </div>
-    </div>
-  )
-}
-
-function Chat() {
-  const [messages, setMessages] = useState([])
-  const [input, setInput] = useState('')
+  const [conversations, setConversations] = useState(loadConversations)
+  const [activeId, setActiveId] = useState(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const scrollRef = useRef(null)
-  const lastMsgRef = useRef(null)
 
   useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const last = messages[messages.length - 1]
-    // When an answer arrives, bring the START of the answer to the top so the
-    // reader scrolls down through it naturally. For the reader's own message
-    // (or the "looking that up" state), keep the newest content at the bottom.
-    if (last && last.role === 'assistant' && lastMsgRef.current) {
-      const cTop = el.getBoundingClientRect().top
-      const mTop = lastMsgRef.current.getBoundingClientRect().top
-      el.scrollTop += mTop - cTop - 12
-    } else {
-      el.scrollTop = el.scrollHeight
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(conversations))
+    } catch {
+      /* storage full or unavailable - history just won't persist */
     }
-  }, [messages, busy])
+  }, [conversations])
+
+  const activeMessages = (activeId ? conversations.find((c) => c.id === activeId)?.messages : null) || []
 
   async function send(text) {
     const q = (text || '').trim()
-    if (!q || busy) return
+    if (!q || busy) return false
     setError('')
-    setInput('')
-    const next = [...messages, { role: 'user', content: q }]
-    setMessages(next)
+    const base = activeMessages
+    const next = [...base, { role: 'user', content: q }]
+    let convId = activeId
+    if (!convId) {
+      convId = genId()
+      setActiveId(convId)
+      setConversations((prev) =>
+        [{ id: convId, createdAt: Date.now(), messages: next }, ...prev].slice(0, MAX_CONVERSATIONS)
+      )
+    } else {
+      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: next } : c)))
+    }
     setBusy(true)
     try {
       const r = await fetch(`${API_ORIGIN}/api/chat`, {
@@ -109,14 +102,131 @@ function Chat() {
       })
       const data = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
-      setMessages((m) => [...m, { role: 'assistant', content: data.reply, sources: data.sources || [] }])
+      const withAnswer = [...next, { role: 'assistant', content: data.reply, sources: data.sources || [] }]
+      setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: withAnswer } : c)))
+      return true
     } catch (e) {
       setError(e.message || 'Something went wrong. Please try again.')
-      setMessages((m) => m.slice(0, -1))
-      setInput(q)
+      // Roll the failed question back out; drop the conversation if it was new/empty.
+      setConversations((prev) =>
+        prev.map((c) => (c.id === convId ? { ...c, messages: base } : c)).filter((c) => c.messages.length > 0)
+      )
+      if (base.length === 0) setActiveId(null)
+      return false
     } finally {
       setBusy(false)
     }
+  }
+
+  function startNew() {
+    setActiveId(null)
+    setError('')
+    setTab('chat')
+  }
+  function openConversation(id) {
+    setActiveId(id)
+    setError('')
+    setTab('chat')
+  }
+  function deleteConversation(id) {
+    setConversations((prev) => prev.filter((c) => c.id !== id))
+    if (activeId === id) {
+      setActiveId(null)
+      setError('')
+    }
+  }
+
+  return (
+    <div style={{ minHeight: '100dvh', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", display: 'flex', flexDirection: 'column' }}>
+      <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, height: '100dvh' }}>
+        <Header tab={tab} setTab={setTab} onAsk={startNew} />
+        {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} />}
+        {tab === 'history' && <History conversations={conversations} onOpen={openConversation} onDelete={deleteConversation} />}
+        {tab === 'library' && <Library />}
+      </div>
+    </div>
+  )
+}
+
+function Header({ tab, setTab, onAsk }) {
+  const tabs = [
+    { key: 'chat', label: 'Ask', onClick: onAsk },
+    { key: 'history', label: 'History', onClick: () => setTab('history') },
+    { key: 'library', label: 'Rights', onClick: () => setTab('library') },
+  ]
+  return (
+    <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: 0.2 }}>HandBook</div>
+          <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>Your HCBS rights, in plain language</div>
+        </div>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          {tabs.map((t) => {
+            const active = tab === t.key
+            return (
+              <button
+                key={t.key}
+                onClick={t.onClick}
+                style={{
+                  border: `1px solid ${active ? C.accent : C.line}`,
+                  background: active ? C.accentSoft : 'transparent',
+                  color: active ? C.accent : C.sub,
+                  borderRadius: 999, padding: '7px 13px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '8px 12px', margin: '12px 0 0', lineHeight: 1.45 }}>
+        General information, not legal advice. Your saved history stays on this device only. Please don't include names or other personal details.
+      </div>
+    </div>
+  )
+}
+
+function Chat({ messages, activeId, busy, error, onSend }) {
+  const [input, setInput] = useState('')
+  const scrollRef = useRef(null)
+  const lastMsgRef = useRef(null)
+  const prevLenRef = useRef(0)
+  const prevActiveRef = useRef(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const switched = activeId !== prevActiveRef.current
+    const prevLen = prevLenRef.current
+    prevActiveRef.current = activeId
+    prevLenRef.current = messages.length
+    const last = messages[messages.length - 1]
+
+    if (switched) {
+      // Opened a different (or brand-new) conversation - start at the top.
+      el.scrollTop = 0
+    } else if (!last) {
+      el.scrollTop = 0
+    } else if (last.role === 'user') {
+      // Just asked - keep the question + "looking that up" pinned at the bottom.
+      el.scrollTop = el.scrollHeight
+    } else if (last.role === 'assistant' && messages.length === prevLen + 1 && lastMsgRef.current) {
+      // A fresh answer arrived - bring its START to the top so the reader
+      // scrolls down through it naturally.
+      const cTop = el.getBoundingClientRect().top
+      const mTop = lastMsgRef.current.getBoundingClientRect().top
+      el.scrollTop += mTop - cTop - 12
+    }
+    // Any other case (e.g. an error rolled a question back): leave scroll as-is.
+  }, [messages, busy, activeId])
+
+  async function submit(text) {
+    const q = (text || '').trim()
+    if (!q || busy) return
+    const ok = await onSend(q)
+    if (ok) setInput('')
   }
 
   return (
@@ -127,7 +237,7 @@ function Chat() {
             <div style={{ fontSize: 14, color: C.sub, marginBottom: 10 }}>Try asking:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
               {STARTERS.map((s) => (
-                <button key={s} onClick={() => send(s)} style={{ border: `1px solid ${C.line}`, background: C.card, color: C.ink, borderRadius: 12, padding: '10px 13px', fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
+                <button key={s} onClick={() => submit(s)} style={{ border: `1px solid ${C.line}`, background: C.card, color: C.ink, borderRadius: 12, padding: '10px 13px', fontSize: 14, cursor: 'pointer', textAlign: 'left' }}>
                   {s}
                 </button>
               ))}
@@ -144,14 +254,14 @@ function Chat() {
       </div>
       <div style={{ padding: '8px 16px calc(env(safe-area-inset-bottom) + 14px)', borderTop: `1px solid ${C.line}`, background: C.bg }}>
         <form
-          onSubmit={(e) => { e.preventDefault(); send(input) }}
+          onSubmit={(e) => { e.preventDefault(); submit(input) }}
           style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}
         >
           <div style={{ flex: 1 }}>
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input) } }}
               placeholder="Ask about your rights…"
               rows={1}
               style={{ width: '100%', resize: 'none', fontSize: 16, fontFamily: 'inherit', color: C.ink, background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: '12px 14px', outline: 'none', WebkitAppearance: 'none', lineHeight: 1.4, maxHeight: 120 }}
@@ -237,6 +347,59 @@ const Bubble = React.forwardRef(function Bubble({ m }, ref) {
     </div>
   )
 })
+
+function TrashIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6" />
+      <path d="M14 11v6" />
+      <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  )
+}
+
+function History({ conversations, onOpen, onDelete }) {
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 16px calc(env(safe-area-inset-bottom) + 24px)', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>Saved questions</div>
+      {conversations.length === 0 ? (
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
+          Your questions are saved here so you can come back to an answer later. Ask something in the Ask tab to get started.
+        </div>
+      ) : (
+        conversations.map((conv) => {
+          const firstQ = (conv.messages.find((m) => m.role === 'user') || {}).content || 'Conversation'
+          const qCount = conv.messages.filter((m) => m.role === 'user').length
+          return (
+            <div key={conv.id} style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.line}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden' }}>
+              <button
+                onClick={() => onOpen(conv.id)}
+                style={{ flex: 1, minWidth: 0, background: 'transparent', border: 'none', padding: '13px 14px', cursor: 'pointer', textAlign: 'left' }}
+              >
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{firstQ}</div>
+                <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>{timeAgo(conv.createdAt)} · {qCount} question{qCount > 1 ? 's' : ''}</div>
+              </button>
+              <button
+                onClick={() => onDelete(conv.id)}
+                aria-label="Delete conversation"
+                style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, background: 'transparent', border: 'none', borderLeft: `1px solid ${C.line}`, color: C.sub, cursor: 'pointer' }}
+              >
+                <TrashIcon />
+              </button>
+            </div>
+          )
+        })
+      )}
+      {conversations.length > 0 && (
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>
+          Saved on this device only. The {MAX_CONVERSATIONS} most recent conversations are kept.
+        </div>
+      )}
+    </div>
+  )
+}
 
 function Library() {
   const [open, setOpen] = useState(null)
