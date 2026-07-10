@@ -6,7 +6,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { CHUNKS, SERVICE_CODES } from './_corpus.js'
 
-const MODEL = 'claude-opus-4-8'
+const MODEL = 'claude-haiku-4-5'
 const MAX_TURNS = 16
 const MAX_MSG_CHARS = 2000
 
