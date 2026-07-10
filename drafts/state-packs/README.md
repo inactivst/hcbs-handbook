@@ -23,5 +23,20 @@ else gets the federal baseline plus a referral.
 3. Commit and push. The state instantly flips to "covered": its pack grounds
    answers, and the Rights page shows a "State guide" badge for it.
 
-Drafted 2026-07-10 from official sources: TX, FL, NY, PA, IL, OH, GA, NC, MI, NJ.
-Remaining 40 states + DC: same process, batches on request.
+## Status: drafting complete
+
+All 50 states + DC were drafted 2026-07-10 from official sources, in nine
+small batches. Nothing is promoted yet - every state above is a draft
+awaiting vetting, one file per state/DC (two-letter code, DC.md for the
+District of Columbia).
+
+A handful of states ship with only 4 chunks (no `-rights` chunk) because no
+verifiable state-specific DD rights statute was found: AR, NE, WV, MT, WY so
+far. That is a deliberate choice, not a gap - don't invent a rights chunk for
+these when vetting; confirm no such statute exists, or find one to add.
+
+Some states' `flags:` note pages that returned 403 or couldn't be fetched
+directly, so a detail rests on search-summarized content rather than a raw
+official page read. Prioritize re-verifying those against the primary source
+before promoting: MD, CO, UT, HI (rights statutes); KS, NH (agency pages);
+AK, VT (appeal deadlines, conflicting figures in VT's case).
