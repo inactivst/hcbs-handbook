@@ -9,6 +9,10 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-title" content="HandBook" />
+    <!-- Standalone (Add to Home Screen): without these iOS paints the
+         status-bar area its own grey instead of the app's background. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <style>
       /* Lock the page: only inner scroll areas move, no full-page rubber-band. */
       html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #F4F3F1; }

@@ -1213,19 +1213,26 @@ function SourceChips({ sources }) {
 // one comparison call and renders that state's angle in a card. Result lives
 // on the message so it persists with the saved conversation.
 function CompareBlock({ compare, baseState, onCompare }) {
-  const options = STATE_OPTIONS.filter((o) => o.value !== baseState)
+  // Only states with a vetted state guide can actually DIFFER from your state;
+  // everywhere else runs on the same federal floor, so listing them would just
+  // produce 49 copies of "the federal baseline applies". The dropdown grows as
+  // the team promotes state packs. (An already-saved compare still renders.)
+  const options = STATE_OPTIONS.filter((o) => o.value !== baseState && stateCovered(o.value))
+  if (options.length === 0 && !compare) return null
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ maxWidth: 280 }}>
-        <Select
-          value={compare?.state || ''}
-          onChange={onCompare}
-          options={options}
-          placeholder="See another state's take…"
-          ariaLabel="Compare with another state"
-          style={{ padding: '7px 11px', borderRadius: 999, fontSize: 13 }}
-        />
-      </div>
+      {options.length > 0 && (
+        <div style={{ maxWidth: 280 }}>
+          <Select
+            value={compare?.state || ''}
+            onChange={onCompare}
+            options={options}
+            placeholder="See another state's take…"
+            ariaLabel="Compare with another state"
+            style={{ padding: '7px 11px', borderRadius: 999, fontSize: 13 }}
+          />
+        </div>
+      )}
       {compare && (
         <div style={{ marginTop: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 13px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 4 }}>
