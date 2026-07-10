@@ -8,7 +8,10 @@
 import { GoogleGenAI } from '@google/genai'
 import { CHUNKS, SERVICE_CODES } from './_corpus.js'
 
-const MODEL = 'gemini-2.5-flash'
+// Alias, not a pinned version - Google hot-swaps this to the current flash
+// model with a 2-week deprecation notice, so it won't 404 when a dated
+// version (e.g. gemini-2.5-flash) is retired.
+const MODEL = 'gemini-flash-latest'
 const MAX_TURNS = 16
 const MAX_MSG_CHARS = 2000
 
