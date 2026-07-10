@@ -3,10 +3,12 @@
 // answered from the public HCBS corpus - nothing is persisted server-side.
 // Explicit .js extension on the relative import: Vercel api/ functions are
 // unbundled ESM and extensionless relative imports crash at runtime.
-import Anthropic from '@anthropic-ai/sdk'
+// Model: Gemini free tier (internal team demo, not for public/user-facing use -
+// see README for the tradeoffs vs. the Claude version this was built on).
+import { GoogleGenAI } from '@google/genai'
 import { CHUNKS, SERVICE_CODES } from './_corpus.js'
 
-const MODEL = 'claude-haiku-4-5'
+const MODEL = 'gemini-2.5-flash'
 const MAX_TURNS = 16
 const MAX_MSG_CHARS = 2000
 
@@ -60,8 +62,8 @@ export default async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' })
     return
   }
-  if (!process.env.ANTHROPIC_API_KEY) {
-    res.status(500).json({ error: 'Server is not configured yet (missing ANTHROPIC_API_KEY).' })
+  if (!process.env.GEMINI_API_KEY) {
+    res.status(500).json({ error: 'Server is not configured yet (missing GEMINI_API_KEY).' })
     return
   }
 
@@ -92,26 +94,25 @@ export default async function handler(req, res) {
     : ''
 
   try {
-    const client = new Anthropic()
-    const response = await client.messages.create({
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+    const response = await ai.models.generateContent({
       model: MODEL,
-      max_tokens: 1024,
-      system: [
-        { type: 'text', text: STATIC_SYSTEM, cache_control: { type: 'ephemeral' } },
-        { type: 'text', text: `Reference excerpts for this question:\n\n${excerpts}${codeBlock}` },
-      ],
-      messages,
+      contents: messages.map((m) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }],
+      })),
+      config: {
+        systemInstruction: `${STATIC_SYSTEM}\n\nReference excerpts for this question:\n\n${excerpts}${codeBlock}`,
+        maxOutputTokens: 1024,
+      },
     })
-    const reply = response.content
-      .filter((b) => b.type === 'text')
-      .map((b) => b.text)
-      .join('')
+    const reply = response.text || ''
     res.status(200).json({
       reply,
       sources: chunks.map((c) => ({ id: c.id, title: c.title, citation: c.citation })),
     })
   } catch (err) {
-    const status = err?.status >= 400 && err?.status < 600 ? err.status : 500
+    const status = err?.status ?? err?.response?.status
     res.status(status === 429 ? 429 : 500).json({
       error:
         status === 429
