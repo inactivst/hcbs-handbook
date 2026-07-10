@@ -112,3 +112,57 @@ export const SERVICE_CODES = [
   { code: '864', name: 'In-Home Respite Worker', note: 'Temporary relief care in the family home, provided by an individual worker.' },
   { code: '868', name: 'Out-of-Home Respite Services', note: 'Temporary care outside the family home, e.g. at a licensed facility.' },
 ]
+
+// --- State-aware layer -----------------------------------------------------
+// HCBS is federal (42 CFR 441.301 applies in every state), but each state
+// implements it through its own Medicaid waivers, agencies, and statutes. So
+// content is a shared FEDERAL base + a per-state pack. A state is "covered"
+// only when it has a pack; uncovered states get the federal baseline plus a
+// referral, never invented state specifics.
+// CHUNKS / SERVICE_CODES above are kept as-is for backward compatibility (the
+// Rights UI still imports them); they equal the federal base + the CA pack.
+
+const CA_CHUNK_IDS = new Set(['ca-lanterman-rights', 'ca-ipp', 'ca-appeals', 'ca-complaints', 'ca-hcbs-compliance'])
+
+// Federal chunks apply to all states.
+export const FEDERAL = CHUNKS.filter((c) => !CA_CHUNK_IDS.has(c.id))
+
+// Per-state packs. Add a state by giving it a name + its own chunks/serviceCodes.
+export const STATES = {
+  CA: {
+    name: 'California',
+    chunks: CHUNKS.filter((c) => CA_CHUNK_IDS.has(c.id)),
+    serviceCodes: SERVICE_CODES,
+  },
+}
+
+// All US states + DC, for the state chooser. `covered` is derived from STATES.
+export const US_STATES = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
+  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'District of Columbia',
+  FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois',
+  IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana',
+  ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan',
+  MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana',
+  NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey',
+  NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota',
+  OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania',
+  RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee',
+  TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington',
+  WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+}
+
+// Resolve the content to ground an answer in for a given state code. Covered
+// states get federal + their pack; uncovered states get the federal baseline
+// only (the caller tells the model to refer out for state specifics).
+export function getStateContent(code) {
+  const key = String(code || '').toUpperCase()
+  const st = STATES[key]
+  return {
+    code: key,
+    name: (st && st.name) || US_STATES[key] || key,
+    covered: !!st,
+    chunks: st ? [...FEDERAL, ...st.chunks] : [...FEDERAL],
+    serviceCodes: st ? st.serviceCodes : [],
+  }
+}

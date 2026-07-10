@@ -18,7 +18,7 @@
 //   GROQ_MODEL / GEMINI_MODEL / XAI_MODEL - per-provider model overrides.
 // NOTE the Groq (GROQ_API_KEY, free) vs Grok (XAI_API_KEY, paid) name collision.
 import { GoogleGenAI } from '@google/genai'
-import { CHUNKS, SERVICE_CODES } from './_corpus.js'
+import { getStateContent } from './_corpus.js'
 import { PLAYBOOK, matchPlaybook } from './_playbook.js'
 
 const MAX_TURNS = 16
@@ -39,16 +39,16 @@ const GROK_MODEL = process.env.XAI_MODEL || 'grok-4.3'
 const XAI_URL = 'https://api.x.ai/v1/chat/completions'
 const OPENAI_COMPAT_TIMEOUT_MS = 20000
 
-const STATIC_SYSTEM = `You are HandBook, a plain-language guide to Home and Community-Based Services (HCBS) rights, with a focus on California's regional center system (Lanterman Act).
+const STATIC_SYSTEM = `You are HandBook, a plain-language guide to Home and Community-Based Services (HCBS) rights for people in the United States. You answer for one U.S. state at a time; the current state and the rules that apply there are given below.
 
 Audience: people receiving services, their families, and direct support staff. Many readers use screen readers or read at a basic level. Write warmly and simply. Short paragraphs. Avoid legal jargon unless you immediately explain it.
 
 Rules:
-- You cover California only. HandBook answers about California's regional center / Lanterman Act system and the federal HCBS rules that apply in California. If someone asks about another state's program, say you only cover California and point them to their own state's Medicaid or developmental services agency.
+- Answer for the current state named below, using the federal HCBS rules and that state's excerpts. If the person asks about a different state, tell them to switch the state selector to that state so you can answer accurately, instead of guessing.
 - Some questions include Program guidance: short answers written and vetted by the HandBook team that capture local nuance. When a Program guidance entry addresses the question, lead with it and treat it as trusted and correct. Still cite the underlying law where relevant. When no Program guidance is provided, answer from the reference excerpts as usual.
 - Ground every answer in the reference excerpts provided below. Cite the source in parentheses, e.g. (42 CFR 441.301(c)(4)(vi)(C)) or (WIC 4731), when you state a right or requirement.
-- If the excerpts do not cover the question, say so honestly and point the person to their regional center service coordinator, OCRA (1-800-390-7032), or dds.ca.gov. Never invent regulations, code numbers, deadlines, or phone numbers.
-- You provide general information about rights, not legal advice. When someone describes a specific dispute, explain the relevant right and the concrete next steps (talk to the service coordinator, request an IPP meeting, file a 4731 complaint, appeal/fair hearing, call OCRA), and remind them these are options, not legal advice.
+- If the excerpts do not cover the question, say so honestly and point the person to their state's Medicaid or developmental-disabilities agency, their local Protection and Advocacy office, and any contact listed in the excerpts. Never invent regulations, code numbers, deadlines, agencies, or phone numbers.
+- You provide general information about rights, not legal advice. When someone describes a specific dispute, explain the relevant right and the concrete next steps (talk to the service coordinator or case manager, request a service-plan meeting, file a rights complaint, appeal or request a fair hearing, contact Protection and Advocacy), and remind them these are options, not legal advice.
 - If someone describes possible abuse, neglect, or immediate danger, tell them to contact Adult/Child Protective Services or 911 first, then the advocacy channels.
 - Do not ask for or encourage sharing of names, addresses, birthdates, or other identifying details. If a message includes them, do not repeat them back; answer the general question.
 - Keep answers focused: usually 1-3 short paragraphs, or a short list of steps. Offer to go deeper rather than writing an essay.
@@ -60,9 +60,9 @@ function tokenize(s) {
 
 const STOP = new Set(['the', 'and', 'for', 'that', 'this', 'with', 'are', 'you', 'can', 'what', 'they', 'have', 'about', 'does', 'how', 'their', 'them', 'she', 'his', 'her', 'was', 'not', 'but', 'get', 'has', 'who', 'when', 'where', 'why', 'your', 'from', 'like'])
 
-function retrieve(query) {
+function retrieve(query, chunks, serviceCodes) {
   const terms = tokenize(query).filter((t) => !STOP.has(t))
-  const scored = CHUNKS.map((c) => {
+  const scored = chunks.map((c) => {
     const hay = tokenize(c.title + ' ' + c.text)
     const haySet = new Set(hay)
     let score = 0
@@ -74,15 +74,15 @@ function retrieve(query) {
   })
   scored.sort((a, b) => b.score - a.score)
   const top = scored.filter((s) => s.score > 0).slice(0, 6).map((s) => s.c)
-  // Always keep at least the overview + complaint paths available as grounding.
+  // Always keep a few chunks as grounding even when the match is weak.
   if (top.length < 3) {
-    for (const id of ['hcbs-overview', 'ca-complaints', 'ca-appeals']) {
-      const c = CHUNKS.find((x) => x.id === id)
+    for (const c of chunks) {
       if (!top.includes(c)) top.push(c)
+      if (top.length >= 3) break
     }
   }
   const codes = [...new Set(query.match(/\b\d{3}\b/g) || [])]
-    .map((n) => SERVICE_CODES.find((s) => s.code === n))
+    .map((n) => serviceCodes.find((s) => s.code === n))
     .filter(Boolean)
   return { chunks: top, codes }
 }
@@ -220,17 +220,27 @@ export default async function handler(req, res) {
     return
   }
 
+  // Ground in the selected state's content (federal base + that state's pack).
+  // Defaults to CA when the client sends no state, so old clients are unchanged.
+  const content = getStateContent(typeof req.body?.state === 'string' ? req.body.state : 'CA')
+
   const lastUser = messages[messages.length - 1].content
   const prevUser = [...messages].reverse().find((m, i) => i > 0 && m.role === 'user')
-  const { chunks, codes } = retrieve(lastUser + ' ' + (prevUser ? prevUser.content : ''))
+  const { chunks, codes } = retrieve(lastUser + ' ' + (prevUser ? prevUser.content : ''), content.chunks, content.serviceCodes)
 
   const excerpts = chunks
     .map((c) => `### ${c.title}\nSource: ${c.citation}\n${c.text}`)
     .join('\n\n')
   const codeBlock = codes.length
-    ? '\n\nService codes mentioned by the user (from the CA DDS published list):\n' +
+    ? `\n\nService codes mentioned by the user (from the ${content.name} published list):\n` +
       codes.map((c) => `- ${c.code}: ${c.name}. ${c.note}`).join('\n')
     : ''
+
+  // Tell the model which state it is answering for, and whether we have that
+  // state's specifics or only the federal baseline (never guess state details).
+  const stateFraming = content.covered
+    ? `Current state: ${content.name}. Answer for ${content.name}, using the federal HCBS rules and the ${content.name} excerpts below.`
+    : `Current state: ${content.name}. HandBook does NOT yet have ${content.name}-specific content loaded. Answer only from the federal HCBS baseline below, say plainly that the ${content.name} specifics are not loaded yet, and tell the person to confirm with ${content.name}'s Medicaid or developmental-disabilities agency and their local Protection and Advocacy office. Do not state ${content.name} statutes, agency names, deadlines, or phone numbers.`
 
   // Team playbook: vetted answers that outrank the raw regs when they match.
   const guidance = matchPlaybook(lastUser + ' ' + (prevUser ? prevUser.content : ''), PLAYBOOK)
@@ -239,7 +249,7 @@ export default async function handler(req, res) {
       guidance.map((g) => `- ${g.a}`).join('\n\n') + '\n\n'
     : ''
 
-  const systemInstruction = `${STATIC_SYSTEM}\n\n${guidanceBlock}Reference excerpts for this question:\n\n${excerpts}${codeBlock}`
+  const systemInstruction = `${STATIC_SYSTEM}\n\n${stateFraming}\n\n${guidanceBlock}Reference excerpts for this question:\n\n${excerpts}${codeBlock}`
 
   const sources = chunks.map((c) => ({ id: c.id, title: c.title, citation: c.citation }))
 
