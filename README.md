@@ -2,12 +2,14 @@
 
 Plain-language chat guide to HCBS (Home and Community-Based Services) rights, focused on California's regional center system. Vite + React front end, one Vercel serverless function grounded in a bundled corpus of public regulations (42 CFR 441.301, Lanterman Act, CA DDS service codes).
 
-**Models:** two providers with automatic failover. The primary answers each request; if it errors or is rate-limited (HTTP 429), the endpoint falls over to the next provider, so a throttled free tier no longer surfaces "HandBook is busy" to users. Grok only joins the chain when `XAI_API_KEY` is set, so the app keeps running on Gemini alone until that key is added.
+**Models:** multiple providers with automatic failover. The primary answers each request; if it errors or is rate-limited (HTTP 429), the endpoint falls over to the next provider, so a throttled free tier no longer surfaces "HandBook is busy". Each provider only joins the chain when its key is set.
 
-- `PROVIDER_ORDER` (default `gemini,grok`) sets primary/fallback. Gemini is primary by default because its free tier is free; Grok (paid) picks up the overflow. Flip to `grok,gemini` to prefer Grok.
-- `GEMINI_MODEL` default `gemini-flash-latest`; `XAI_MODEL` default `grok-4.3`.
+- **Groq** (`GROQ_API_KEY`) is the recommended **free** primary: the inference company Groq (with a Q), NOT xAI's Grok. Free tier, no credit card, ~1,000 req/day on `llama-3.3-70b-versatile` (set `GROQ_MODEL=llama-3.1-8b-instant` for 14,400/day). Key at console.groq.com.
+- **Gemini** (`GEMINI_API_KEY`) is a weak free fallback: for a new project `gemini-flash-latest` resolves to `gemini-3.5-flash` at only 20 req/day, and `gemini-2.5-flash` 404s ("not available to new users"). Do not rely on it.
+- **Grok** (`XAI_API_KEY`, `XAI_MODEL` default `grok-4.3`) is xAI's paid model; needs credits on the xAI team.
+- `PROVIDER_ORDER` (default `groq,gemini,grok`) sets the failover order.
 
-The app was originally built and tested on `claude-opus-4-8` / `claude-haiku-4-5` via the Anthropic API; Claude can be dropped into the same provider map in `api/chat.js` (re-add `@anthropic-ai/sdk` and add a `callClaude` alongside `callGemini` / `callGrok`).
+The app was originally built and tested on `claude-opus-4-8` / `claude-haiku-4-5` via the Anthropic API; Claude can be dropped into the same provider map in `api/chat.js` (re-add `@anthropic-ai/sdk` and add a `callClaude` alongside the others).
 
 ## Privacy model
 - No accounts, no database, no server-side storage or logging of messages.
@@ -16,10 +18,11 @@ The app was originally built and tested on `claude-opus-4-8` / `claude-haiku-4-5
 
 ## Deploy (Vercel)
 1. Import the repo into Vercel (framework: Vite).
-2. Add env vars to Production + Preview:
-   - `GEMINI_API_KEY` (required; get one free at aistudio.google.com/apikey)
-   - `XAI_API_KEY` (optional; from console.x.ai) enables the Grok fallback that clears the "busy" rate-limit wall
-   - `PROVIDER_ORDER`, `GEMINI_MODEL`, `XAI_MODEL` (all optional; see Models above)
+2. Add env vars to Production + Preview (at least one provider key):
+   - `GROQ_API_KEY` (recommended; free, no card, from console.groq.com) - the free primary
+   - `GEMINI_API_KEY` (free at aistudio.google.com/apikey, but tiny free tier for new projects)
+   - `XAI_API_KEY` (optional; paid, from console.x.ai)
+   - `PROVIDER_ORDER`, `GROQ_MODEL`, `GEMINI_MODEL`, `XAI_MODEL` (all optional; see Models above)
 3. After first deploy, smoke-test the live endpoint (api/ functions are unbundled ESM). The JSON includes `provider` so you can see which model answered:
    `curl -X POST https://<domain>/api/chat -H 'Content-Type: application/json' -d '{"messages":[{"role":"user","content":"Can my group home lock the fridge?"}]}'`
 

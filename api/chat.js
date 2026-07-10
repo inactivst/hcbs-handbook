@@ -4,16 +4,19 @@
 // Explicit .js extension on the relative import: Vercel api/ functions are
 // unbundled ESM and extensionless relative imports crash at runtime.
 //
-// Models: two providers with automatic failover. The primary answers; if it
-// errors or is rate-limited (429), we fall over to the next provider so a
-// throttled free tier no longer shows users "busy". Order and models are
-// env-configurable (see below). Grok is only in the chain when XAI_API_KEY is
-// set, so the app still runs on Gemini alone until that key is added.
-//   GEMINI_API_KEY   - Google AI Studio key (free tier by default)
-//   XAI_API_KEY      - xAI key for Grok (paid); enables the fallback
-//   PROVIDER_ORDER   - comma list, default "gemini,grok" (flip to prefer Grok)
-//   GEMINI_MODEL     - default "gemini-flash-latest"
-//   XAI_MODEL        - default "grok-4.3"
+// Models: multiple providers with automatic failover. The primary answers; if
+// it errors or is rate-limited (429), we fall over to the next provider so a
+// throttled free tier no longer shows users "busy". A provider only joins the
+// chain when its key is set, so the app runs on whatever keys exist.
+//   GROQ_API_KEY     - Groq (the inference company, NOT xAI's Grok) - FREE tier,
+//                      no card, ~1,000 req/day on llama-3.3-70b. The free path.
+//   GEMINI_API_KEY   - Google AI Studio key. Free tier for this project is tiny
+//                      (gemini-flash-latest resolves to gemini-3.5-flash = 20/day;
+//                      gemini-2.5-flash 404s for new projects). Weak fallback.
+//   XAI_API_KEY      - xAI's Grok (paid, needs credits on the xAI team).
+//   PROVIDER_ORDER   - comma list, default "groq,gemini,grok".
+//   GROQ_MODEL / GEMINI_MODEL / XAI_MODEL - per-provider model overrides.
+// NOTE the Groq (GROQ_API_KEY, free) vs Grok (XAI_API_KEY, paid) name collision.
 import { GoogleGenAI } from '@google/genai'
 import { CHUNKS, SERVICE_CODES } from './_corpus.js'
 import { PLAYBOOK, matchPlaybook } from './_playbook.js'
@@ -22,19 +25,19 @@ const MAX_TURNS = 16
 const MAX_MSG_CHARS = 2000
 const MAX_OUTPUT_TOKENS = 1024
 
-// Pin gemini-2.5-flash for its FREE-TIER quota. The `gemini-flash-latest`
-// alias now resolves to gemini-3.5-flash, whose free tier is only 20 requests
-// per DAY (confirmed in Vercel runtime logs), which is what surfaced as
-// "HandBook is busy". Pinned gemini-2.5-flash gets 1,500 requests/day free.
-// Tradeoff: a pinned model can eventually be retired (404); if that happens,
-// set GEMINI_MODEL to the current free flash model (or gemini-2.5-flash-lite,
-// which has double the per-minute limit).
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
-// xAI model id (literal, dot notation). grok-4.3 is xAI's current general
-// chat model; override via XAI_MODEL if they retire it.
+// Groq (free) - OpenAI-compatible. llama-3.3-70b-versatile: ~1,000 req/day,
+// 30 req/min on the free tier. Override GROQ_MODEL to llama-3.1-8b-instant for
+// 14,400/day if you need more volume and can accept a smaller model.
+const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile'
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+// Gemini: gemini-flash-latest resolves to gemini-3.5-flash (20/day free for a
+// new project). gemini-2.5-flash 404s ("not available to new users"), verified
+// live, so do NOT pin it. Weak but free fallback.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest'
+// xAI Grok (paid). grok-4.3 is xAI's current general model; override XAI_MODEL.
 const GROK_MODEL = process.env.XAI_MODEL || 'grok-4.3'
 const XAI_URL = 'https://api.x.ai/v1/chat/completions'
-const GROK_TIMEOUT_MS = 20000
+const OPENAI_COMPAT_TIMEOUT_MS = 20000
 
 const STATIC_SYSTEM = `You are HandBook, a plain-language guide to Home and Community-Based Services (HCBS) rights, with a focus on California's regional center system (Lanterman Act).
 
@@ -116,18 +119,20 @@ async function callGemini({ systemInstruction, messages }) {
   return reply
 }
 
-async function callGrok({ systemInstruction, messages }) {
+// Groq and xAI Grok both speak the OpenAI chat-completions format, so one
+// helper serves both. Returns reply text; throws with .status on failure.
+async function callOpenAICompatible({ label, url, apiKey, model, systemInstruction, messages }) {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), GROK_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), OPENAI_COMPAT_TIMEOUT_MS)
   try {
-    const r = await fetch(XAI_URL, {
+    const r = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.XAI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: GROK_MODEL,
+        model,
         messages: [
           { role: 'system', content: systemInstruction },
           ...messages.map((m) => ({
@@ -144,14 +149,14 @@ async function callGrok({ systemInstruction, messages }) {
     if (!r.ok) {
       let detail = ''
       try { detail = (await r.text()).slice(0, 300) } catch { /* ignore */ }
-      const e = new Error(`xAI ${r.status} ${detail}`)
+      const e = new Error(`${label} ${r.status} ${detail}`)
       e.status = r.status
       throw e
     }
     const data = await r.json()
     const reply = (data?.choices?.[0]?.message?.content || '').trim()
     if (!reply) {
-      const e = new Error('empty grok reply')
+      const e = new Error(`empty ${label} reply`)
       e.status = 502
       throw e
     }
@@ -161,13 +166,29 @@ async function callGrok({ systemInstruction, messages }) {
   }
 }
 
+// Groq (free inference) and xAI Grok (paid) - same wire format, different hosts.
+function callGroq({ systemInstruction, messages }) {
+  return callOpenAICompatible({
+    label: 'Groq', url: GROQ_URL, apiKey: process.env.GROQ_API_KEY,
+    model: GROQ_MODEL, systemInstruction, messages,
+  })
+}
+
+function callGrok({ systemInstruction, messages }) {
+  return callOpenAICompatible({
+    label: 'xAI', url: XAI_URL, apiKey: process.env.XAI_API_KEY,
+    model: GROK_MODEL, systemInstruction, messages,
+  })
+}
+
 const PROVIDERS = {
+  groq: { call: callGroq, available: () => !!process.env.GROQ_API_KEY },
   gemini: { call: callGemini, available: () => !!process.env.GEMINI_API_KEY },
   grok: { call: callGrok, available: () => !!process.env.XAI_API_KEY },
 }
 
 function providerOrder() {
-  const raw = (process.env.PROVIDER_ORDER || 'gemini,grok')
+  const raw = (process.env.PROVIDER_ORDER || 'groq,gemini,grok')
     .split(',')
     .map((s) => s.trim().toLowerCase())
   return raw.filter((name) => PROVIDERS[name] && PROVIDERS[name].available())
