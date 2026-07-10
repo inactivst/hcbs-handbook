@@ -8,10 +8,31 @@
     <style>
       /* Lock the page: only inner scroll areas move, no full-page rubber-band. */
       html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: #F4F3F1; }
+      /* Font on <body> (not just the app shell): sheets/menus portal to document.body
+         and would otherwise fall back to the browser's default serif. */
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #2B2A28; }
       #root { height: 100%; }
-      * { box-sizing: border-box; }
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      /* 16px floor: iOS zooms on focus when a field's font is smaller and never zooms back. */
       input, select, textarea { font-size: 16px; }
       button { font-family: inherit; }
+      body { touch-action: manipulation; -webkit-touch-callout: none; }
+      button, nav, a { -webkit-user-select: none; user-select: none; }
+      input, textarea, [contenteditable] { -webkit-touch-callout: default; -webkit-user-select: text; user-select: text; }
+      /* Placeholders pinned to one grey so every hint reads the same (browser defaults vary). */
+      input::placeholder, textarea::placeholder { color: #8A857D; opacity: 1; }
+      input::-webkit-input-placeholder, textarea::-webkit-input-placeholder { color: #8A857D; }
+      /* Refined focus state: the active field gets a teal ring so it's obvious which
+         one you're editing. !important because inline styles win otherwise; keeps the
+         well's inset shadow and adds the ring. */
+      input:not([type="checkbox"]):not([type="radio"]):focus,
+      textarea:focus,
+      select:focus {
+        border-color: #2E7D74 !important;
+        box-shadow: inset 0 1px 2px rgba(43,42,40,0.05), 0 0 0 3px rgba(46,125,116,0.20) !important;
+      }
+      ::selection { background: rgba(46,125,116,0.22); }
+      @keyframes hb-spin { to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
