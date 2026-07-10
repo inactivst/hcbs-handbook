@@ -1218,10 +1218,9 @@ function CompareBlock({ compare, baseState, onCompare }) {
   // produce 49 copies of "the federal baseline applies". The dropdown grows as
   // the team promotes state packs. (An already-saved compare still renders.)
   const options = STATE_OPTIONS.filter((o) => o.value !== baseState && stateCovered(o.value))
-  if (options.length === 0 && !compare) return null
   return (
     <div style={{ marginTop: 8 }}>
-      {options.length > 0 && (
+      {options.length > 0 ? (
         <div style={{ maxWidth: 280 }}>
           <Select
             value={compare?.state || ''}
@@ -1231,6 +1230,14 @@ function CompareBlock({ compare, baseState, onCompare }) {
             ariaLabel="Compare with another state"
             style={{ padding: '7px 11px', borderRadius: 999, fontSize: 13 }}
           />
+        </div>
+      ) : (
+        // No other state has its own vetted guide yet, so there is nothing
+        // different to compare. Say so - a silently missing feature reads
+        // as broken. This line is replaced by the dropdown automatically as
+        // state guides are added.
+        <div style={{ fontSize: 12, color: C.ink3, lineHeight: 1.5 }}>
+          Other states currently follow the same federal baseline. State-to-state comparisons will appear here as state guides are added.
         </div>
       )}
       {compare && (
