@@ -58,7 +58,17 @@ const serif = "Georgia, 'Times New Roman', serif"
 function loadConversations() {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORE_KEY) || '[]')
-    return Array.isArray(parsed) ? parsed : []
+    if (!Array.isArray(parsed)) return []
+    // A compare left mid-flight (app closed while loading) must not persist as
+    // an eternal spinner - drop the stub so the dropdown is offered fresh.
+    return parsed.map((c) => ({
+      ...c,
+      messages: (c.messages || []).map((m) =>
+        m.compare && (m.compare.loading || (!m.compare.text && !m.compare.error))
+          ? { ...m, compare: undefined }
+          : m
+      ),
+    }))
   } catch {
     return []
   }
@@ -846,6 +856,50 @@ export default function App() {
     }
   }
 
+  // "How would another state answer this?" - one extra grounded call, fired
+  // only when the person picks a state under an answer. The result is stored
+  // on the message itself so it persists with the conversation.
+  async function compareAnswer(msgIndex, target) {
+    const convId = activeId
+    if (!convId || !target) return
+    const conv = conversations.find((c) => c.id === convId)
+    const msgs = conv?.messages || []
+    const answer = msgs[msgIndex]
+    if (!answer || answer.role !== 'assistant') return
+    const question = msgs.slice(0, msgIndex).reverse().find((m) => m.role === 'user')
+    if (!question) return
+    const base = stateCode || 'CA'
+    const patch = (compare) =>
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === convId
+            ? { ...c, messages: c.messages.map((m, i) => (i === msgIndex ? { ...m, compare } : m)) }
+            : c
+        )
+      )
+    patch({ state: target, loading: true })
+    try {
+      const r = await fetch(`${API_ORIGIN}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          state: base,
+          compareTo: target,
+          messages: [
+            { role: 'user', content: question.content },
+            { role: 'assistant', content: answer.content },
+            { role: 'user', content: `How would ${stateName(target)} answer this same question? What is different from ${stateName(base)}?` },
+          ],
+        }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(data.error || 'Could not compare right now. Please try again.')
+      patch({ state: target, text: data.reply, sources: data.sources || [] })
+    } catch (e) {
+      patch({ state: target, error: e.message || 'Could not compare right now. Please try again.' })
+    }
+  }
+
   function startNew() {
     setActiveId(null)
     setError('')
@@ -875,7 +929,7 @@ export default function App() {
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Header onSettings={() => setShowSettings(true)} onCloud={() => setShowCloud(true)} />
-        {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
+        {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
         {tab === 'history' && <History conversations={conversations} onOpen={openConversation} onDelete={deleteConversation} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
       </div>
@@ -996,7 +1050,7 @@ function StateBar({ stateCode, onStateChange }) {
   )
 }
 
-function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onStateChange }) {
+function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onStateChange, onCompare }) {
   const [input, setInput] = useState('')
   const scrollRef = useRef(null)
   const lastMsgRef = useRef(null)
@@ -1058,7 +1112,13 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
               </div>
             )}
             {messages.map((m, i) => (
-              <Bubble key={i} m={m} ref={i === messages.length - 1 ? lastMsgRef : null} />
+              <Bubble
+                key={i}
+                m={m}
+                baseState={stateCode}
+                onCompare={m.role === 'assistant' ? (target) => onCompare(i, target) : undefined}
+                ref={i === messages.length - 1 ? lastMsgRef : null}
+              />
             ))}
             <div style={{ minHeight: 26, padding: '2px 4px' }}>
               {busy && <span style={{ fontSize: 13, color: C.sub }}>Looking that up…</span>}
@@ -1136,7 +1196,58 @@ function renderContent(text) {
   })
 }
 
-const Bubble = React.forwardRef(function Bubble({ m }, ref) {
+function SourceChips({ sources }) {
+  if (!sources || sources.length === 0) return null
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+      {sources.slice(0, 3).map((s) => (
+        <span key={s.id} style={{ fontSize: 11, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 999, padding: '3px 9px' }}>
+          {s.citation}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// "See another state's take" - dropdown under an answer; picking a state runs
+// one comparison call and renders that state's angle in a card. Result lives
+// on the message so it persists with the saved conversation.
+function CompareBlock({ compare, baseState, onCompare }) {
+  const options = STATE_OPTIONS.filter((o) => o.value !== baseState)
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ maxWidth: 280 }}>
+        <Select
+          value={compare?.state || ''}
+          onChange={onCompare}
+          options={options}
+          placeholder="See another state's take…"
+          ariaLabel="Compare with another state"
+          style={{ padding: '7px 11px', borderRadius: 999, fontSize: 13 }}
+        />
+      </div>
+      {compare && (
+        <div style={{ marginTop: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 13px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 4 }}>
+            {stateName(compare.state)}{stateCovered(compare.state) ? '' : ' · federal rules only'}
+          </div>
+          {compare.loading ? (
+            <div style={{ fontSize: 13, color: C.sub }}>Comparing…</div>
+          ) : compare.error ? (
+            <div style={{ fontSize: 13, color: C.danger }}>{compare.error}</div>
+          ) : (
+            <div style={{ fontSize: 14, lineHeight: 1.55, color: C.ink, wordBreak: 'break-word' }}>
+              {renderContent(compare.text)}
+              <SourceChips sources={compare.sources} />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref) {
   const user = m.role === 'user'
   return (
     <div ref={ref} style={{ display: 'flex', justifyContent: user ? 'flex-end' : 'flex-start', margin: '10px 0' }}>
@@ -1155,15 +1266,8 @@ const Bubble = React.forwardRef(function Bubble({ m }, ref) {
         >
           {user ? <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span> : renderContent(m.content)}
         </div>
-        {!user && m.sources && m.sources.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
-            {m.sources.slice(0, 3).map((s) => (
-              <span key={s.id} style={{ fontSize: 11, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 999, padding: '3px 9px' }}>
-                {s.citation}
-              </span>
-            ))}
-          </div>
-        )}
+        {!user && <SourceChips sources={m.sources} />}
+        {!user && onCompare && <CompareBlock compare={m.compare} baseState={baseState} onCompare={onCompare} />}
       </div>
     </div>
   )

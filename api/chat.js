@@ -239,14 +239,30 @@ export default async function handler(req, res) {
   // Ground in the selected state's content (federal base + that state's pack).
   // Defaults to CA when the client sends no state, so old clients are unchanged.
   const content = getStateContent(typeof req.body?.state === 'string' ? req.body.state : 'CA')
+  // Compare mode: the person already has an answer for `state` and wants to see
+  // how `compareTo` handles the same question. One extra grounded call, only
+  // when the user asks (keeps free-tier volume sane).
+  const compareContent = typeof req.body?.compareTo === 'string' && req.body.compareTo
+    ? getStateContent(req.body.compareTo)
+    : null
 
   const lastUser = messages[messages.length - 1].content
   const prevUser = [...messages].reverse().find((m, i) => i > 0 && m.role === 'user')
-  const { chunks, codes } = retrieve(lastUser + ' ' + (prevUser ? prevUser.content : ''), content.chunks, content.serviceCodes)
+  const query = lastUser + ' ' + (prevUser ? prevUser.content : '')
+  const { chunks, codes } = retrieve(query, content.chunks, content.serviceCodes)
 
-  const excerpts = chunks
-    .map((c) => `### ${c.title}\nSource: ${c.citation}\n${c.text}`)
-    .join('\n\n')
+  // In compare mode also retrieve from the target state's pack, and label every
+  // excerpt with its state so the model can't cross the streams.
+  const compareChunks = compareContent
+    ? retrieve(query, compareContent.chunks, compareContent.serviceCodes).chunks
+    : []
+  const renderChunk = (c, label) => `### ${label ? `[${label}] ` : ''}${c.title}\nSource: ${c.citation}\n${c.text}`
+  const excerpts = compareContent
+    ? [
+        ...chunks.map((c) => renderChunk(c, content.name)),
+        ...compareChunks.map((c) => renderChunk(c, compareContent.name)),
+      ].join('\n\n')
+    : chunks.map((c) => renderChunk(c)).join('\n\n')
   const codeBlock = codes.length
     ? `\n\nService codes mentioned by the user (from the ${content.name} published list):\n` +
       codes.map((c) => `- ${c.code}: ${c.name}. ${c.note}`).join('\n')
@@ -254,9 +270,14 @@ export default async function handler(req, res) {
 
   // Tell the model which state it is answering for, and whether we have that
   // state's specifics or only the federal baseline (never guess state details).
-  const stateFraming = content.covered
+  let stateFraming = content.covered
     ? `Current state: ${content.name}. Answer for ${content.name}, using the federal HCBS rules and the ${content.name} excerpts below.`
     : `Current state: ${content.name}. HandBook does NOT yet have ${content.name}-specific content loaded. Answer only from the federal HCBS baseline below, say plainly that the ${content.name} specifics are not loaded yet, and tell the person to confirm with ${content.name}'s Medicaid or developmental-disabilities agency and their local Protection and Advocacy office. Do not state ${content.name} statutes, agency names, deadlines, or phone numbers.`
+  if (compareContent) {
+    stateFraming = compareContent.covered
+      ? `The person already received the ${content.name} answer shown in the conversation. Now explain how ${compareContent.name} would answer the SAME question, using only the [${compareContent.name}] excerpts and the federal rules. Lead with what is actually different in ${compareContent.name} (agencies, plan names, deadlines, processes); then briefly note what stays the same because the federal floor applies everywhere. Do not repeat the whole ${content.name} answer. Keep it to 1-2 short paragraphs.`
+      : `The person already received the ${content.name} answer shown in the conversation and wants to know how ${compareContent.name} compares. HandBook does NOT yet have ${compareContent.name}-specific content loaded. Say that plainly, explain that the federal HCBS baseline (the same floor as ${content.name}) applies in ${compareContent.name} too, and refer them to ${compareContent.name}'s Medicaid or developmental-disabilities agency and their local Protection and Advocacy office. Do not state ${compareContent.name} statutes, agency names, deadlines, or phone numbers. Keep it to one short paragraph.`
+  }
 
   // Team playbook: vetted answers that outrank the raw regs when they match.
   const guidance = matchPlaybook(lastUser + ' ' + (prevUser ? prevUser.content : ''), PLAYBOOK)
@@ -267,7 +288,10 @@ export default async function handler(req, res) {
 
   const systemInstruction = `${STATIC_SYSTEM}\n\n${stateFraming}\n\n${guidanceBlock}Reference excerpts for this question:\n\n${excerpts}${codeBlock}`
 
-  const sources = chunks.map((c) => ({ id: c.id, title: c.title, citation: c.citation }))
+  // Compare replies cite the TARGET state's grounding (the base answer's chips
+  // already sit on the original bubble).
+  const sources = (compareContent ? compareChunks : chunks)
+    .map((c) => ({ id: c.id, title: c.title, citation: c.citation }))
 
   // Try each configured provider in order; fall over on any error.
   const errors = []
