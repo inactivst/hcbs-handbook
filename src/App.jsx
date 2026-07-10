@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CHUNKS, SERVICE_CODES } from '../api/_corpus.js'
+import { FEDERAL, STATES, US_STATES } from '../api/_corpus.js'
 
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
@@ -11,6 +11,14 @@ const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
 // (Future accounts will keep history indefinitely in the cloud; local stays capped.)
 const STORE_KEY = 'handbook.conversations.v1'
 const MAX_CONVERSATIONS = 50
+
+// The user's chosen state grounds every answer and the Rights page. Empty until
+// the first-launch prompt is answered; persisted on this device like history.
+const STATE_KEY = 'handbook.state.v1'
+
+const STATE_OPTIONS = Object.entries(US_STATES).map(([value, label]) => ({ value, label }))
+const stateName = (code) => US_STATES[code] || code
+const stateCovered = (code) => !!STATES[code]
 
 // Professional, neutral palette (greige + teal) - distinct from the warm cream
 // of the other Book apps. `border` is the refined outlined-field/card tone
@@ -773,6 +781,15 @@ export default function App() {
   const [error, setError] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const [showCloud, setShowCloud] = useState(false)
+  // '' = never chosen -> first-launch prompt asks. Chosen state grounds every
+  // answer (sent with each question) and drives the Rights page split.
+  const [stateCode, setStateCode] = useState(() => {
+    try { return localStorage.getItem(STATE_KEY) || '' } catch { return '' }
+  })
+  const chooseState = (code) => {
+    setStateCode(code)
+    try { localStorage.setItem(STATE_KEY, code) } catch { /* just won't persist */ }
+  }
 
   useGlobalFieldRecenter()
 
@@ -807,7 +824,10 @@ export default function App() {
       const r = await fetch(`${API_ORIGIN}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: next.map(({ role, content }) => ({ role, content })) }),
+        body: JSON.stringify({
+          state: stateCode || 'CA',
+          messages: next.map(({ role, content }) => ({ role, content })),
+        }),
       })
       const data = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
@@ -855,11 +875,12 @@ export default function App() {
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Header onSettings={() => setShowSettings(true)} onCloud={() => setShowCloud(true)} />
-        {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} />}
+        {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
         {tab === 'history' && <History conversations={conversations} onOpen={openConversation} onDelete={deleteConversation} />}
-        {tab === 'library' && <Library />}
+        {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
       </div>
       <Nav tab={tab} setTab={setTab} onAsk={startNew} />
+      {!stateCode && <StatePrompt onChoose={chooseState} />}
       {showSettings && (
         <SettingsSheet
           onClose={() => setShowSettings(false)}
@@ -953,7 +974,29 @@ function Nav({ tab, setTab, onAsk }) {
   )
 }
 
-function Chat({ messages, activeId, busy, error, onSend, onNew }) {
+// Compact "Answering for [state]" chooser - the same Select used everywhere,
+// shrunk to a pill so it reads as a setting, not a form field.
+function StateBar({ stateCode, onStateChange }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 0', flexShrink: 0 }}>
+      <span style={{ fontSize: 13, color: C.sub, flexShrink: 0 }}>Answering for</span>
+      <div style={{ flex: 1, minWidth: 0, maxWidth: 240 }}>
+        <Select
+          value={stateCode}
+          onChange={onStateChange}
+          options={STATE_OPTIONS}
+          ariaLabel="State"
+          style={{ padding: '7px 11px', borderRadius: 999, fontSize: 14 }}
+        />
+      </div>
+      {!stateCovered(stateCode) && (
+        <span style={{ fontSize: 12, color: C.ink3, flexShrink: 0 }}>federal rules only</span>
+      )}
+    </div>
+  )
+}
+
+function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onStateChange }) {
   const [input, setInput] = useState('')
   const scrollRef = useRef(null)
   const lastMsgRef = useRef(null)
@@ -997,6 +1040,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew }) {
 
   return (
     <>
+      <StateBar stateCode={stateCode} onStateChange={onStateChange} />
       <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {indicator}
         <div ref={contentRef} style={{ ...contentStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -1173,46 +1217,129 @@ function History({ conversations, onOpen, onDelete }) {
   )
 }
 
-function Library() {
+// Disclosure card list shared by every Rights section (federal, your state,
+// inside another state's row). One open at a time per list.
+function ChunkList({ chunks }) {
   const [open, setOpen] = useState(null)
+  return chunks.map((c) => {
+    const isOpen = open === c.id
+    return (
+      <div key={c.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <button
+          onClick={() => setOpen(isOpen ? null : c.id)}
+          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'transparent', border: 'none', padding: '13px 14px', cursor: 'pointer', textAlign: 'left' }}
+        >
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.title}</div>
+            <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{c.citation}</div>
+          </div>
+          {/* Disclosure convention: right → down (never a plain text glyph). */}
+          <IcChevron dir={isOpen ? 'down' : 'right'} size={16} style={{ color: C.accent, flexShrink: 0 }} />
+        </button>
+        {isOpen && (
+          <div style={{ padding: '0 14px 14px', fontSize: 14, lineHeight: 1.6, color: C.ink, whiteSpace: 'pre-wrap' }}>{c.text}</div>
+        )}
+      </div>
+    )
+  })
+}
+
+function ServiceCodeList({ codes }) {
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '6px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+      {codes.map((s, i) => (
+        <div key={s.code} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>
+            <span style={{ color: C.accent, fontVariantNumeric: 'tabular-nums' }}>{s.code}</span>  {s.name}
+          </div>
+          <div style={{ fontSize: 13, color: C.sub, marginTop: 3, lineHeight: 1.5 }}>{s.note}</div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function SectionTitle({ children, first = false }) {
+  return <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: `${first ? 4 : 22}px 0 10px` }}>{children}</div>
+}
+
+// What a state's pack contains, rendered both for "your state" and inside an
+// expanded row under "Other states".
+function StatePack({ code, compact = false }) {
+  const pack = STATES[code]
+  const name = stateName(code)
+  if (!pack) {
+    return (
+      <div style={{ background: compact ? 'transparent' : C.card, border: compact ? 'none' : `1px solid ${C.border}`, borderRadius: 14, padding: compact ? '0 0 4px' : '14px 16px', fontSize: 14, color: C.sub, lineHeight: 1.6, boxShadow: compact ? 'none' : '0 1px 2px rgba(43,42,40,0.04)' }}>
+        {name}-specific rules aren't loaded yet. The federal HCBS rights below apply in {name} too, and answers for {name} use that federal baseline. For state specifics, contact {name}'s Medicaid or developmental-disabilities agency, or your local Protection and Advocacy office (find yours at ndrn.org).
+      </div>
+    )
+  }
+  return (
+    <>
+      <ChunkList chunks={pack.chunks} />
+      {pack.serviceCodes.length > 0 && (
+        <>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, margin: '12px 0 8px' }}>Common service codes</div>
+          <ServiceCodeList codes={pack.serviceCodes} />
+        </>
+      )}
+    </>
+  )
+}
+
+function Library({ stateCode, onStateChange }) {
+  const [openState, setOpenState] = useState(null)
+  const covered = stateCovered(stateCode)
+  const otherStates = STATE_OPTIONS.filter((o) => o.value !== stateCode)
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
-      <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>Your rights</div>
-      {CHUNKS.map((c) => {
-        const isOpen = open === c.id
+      <SectionTitle first>Your state</SectionTitle>
+      <div style={{ marginBottom: 10 }}>
+        <Select value={stateCode} onChange={onStateChange} options={STATE_OPTIONS} ariaLabel="Your state" />
+      </div>
+      <StatePack code={stateCode} />
+      {covered && stateCode === 'CA' && (
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>
+          Partial service-code list. The full crosswalk is published by the CA Department of Developmental Services at dds.ca.gov. Free advocacy help: OCRA at Disability Rights California, 1-800-390-7032.
+        </div>
+      )}
+
+      <SectionTitle>Federal rights (all states)</SectionTitle>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
+        The federal HCBS Settings Rule applies in every state and is the floor your state builds on.
+      </div>
+      <ChunkList chunks={FEDERAL} />
+
+      <SectionTitle>Other states</SectionTitle>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
+        Tap a state to see what HandBook has for it. Every state gets the federal rights above; state-specific guides are added as the team vets them.
+      </div>
+      {otherStates.map((o) => {
+        const isOpen = openState === o.value
+        const has = stateCovered(o.value)
         return (
-          <div key={c.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <div key={o.value} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
             <button
-              onClick={() => setOpen(isOpen ? null : c.id)}
+              onClick={() => setOpenState(isOpen ? null : o.value)}
               style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'transparent', border: 'none', padding: '13px 14px', cursor: 'pointer', textAlign: 'left' }}
             >
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.title}</div>
-                <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{c.citation}</div>
+              <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{o.label}</span>
+                {has && (
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: C.accentSoft, borderRadius: 999, padding: '2px 8px' }}>State guide</span>
+                )}
               </div>
-              {/* Disclosure convention: right → down (never a plain text glyph). */}
               <IcChevron dir={isOpen ? 'down' : 'right'} size={16} style={{ color: C.accent, flexShrink: 0 }} />
             </button>
             {isOpen && (
-              <div style={{ padding: '0 14px 14px', fontSize: 14, lineHeight: 1.6, color: C.ink, whiteSpace: 'pre-wrap' }}>{c.text}</div>
+              <div style={{ padding: '0 14px 14px' }}>
+                <StatePack code={o.value} compact />
+              </div>
             )}
           </div>
         )
       })}
-      <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '20px 0 10px' }}>Common service codes</div>
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '6px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
-        {SERVICE_CODES.map((s, i) => (
-          <div key={s.code} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>
-              <span style={{ color: C.accent, fontVariantNumeric: 'tabular-nums' }}>{s.code}</span>  {s.name}
-            </div>
-            <div style={{ fontSize: 13, color: C.sub, marginTop: 3, lineHeight: 1.5 }}>{s.note}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>
-        Partial list. The full service code crosswalk is published by the CA Department of Developmental Services at dds.ca.gov. Free advocacy help: OCRA at Disability Rights California, 1-800-390-7032.
-      </div>
     </div>
   )
 }
@@ -1273,6 +1400,38 @@ function SettingsSheet({ onClose, count, onDeleteAll }) {
           Free advocacy help: OCRA at Disability Rights California, 1-800-390-7032 · dds.ca.gov
         </div>
       </SheetSection>
+    </Modal>
+  )
+}
+
+// First-launch: ask which state grounds the answers. One-time - dismissing
+// without picking keeps the California default (and persists it, so the prompt
+// never nags); the choice is always changeable from the Ask and Rights pages.
+function StatePrompt({ onChoose }) {
+  const [picked, setPicked] = useState('')
+  return (
+    <Modal onClose={() => onChoose('CA')} title="Where do you live?">
+      <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>
+        HCBS rights start with the same federal rules everywhere, but each state runs its own program.
+        Pick your state so answers fit where you live. You can change it anytime.
+      </div>
+      <Select
+        value={picked}
+        onChange={setPicked}
+        options={STATE_OPTIONS}
+        placeholder="Choose your state…"
+        ariaLabel="Your state"
+      />
+      <button
+        onClick={() => onChoose(picked || 'CA')}
+        style={{
+          width: '100%', marginTop: 12, border: 'none', borderRadius: 12,
+          background: C.accent, color: '#fff',
+          padding: '13px 14px', fontSize: 15, fontWeight: 700, cursor: 'pointer',
+        }}
+      >
+        {picked ? 'Continue' : 'Skip - use California'}
+      </button>
     </Modal>
   )
 }
