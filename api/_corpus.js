@@ -79,8 +79,8 @@ export const CHUNKS = [
   {
     id: 'ca-appeals',
     title: 'California: appealing a regional center decision',
-    citation: 'CA Welfare & Institutions Code § 4710 et seq.',
-    text: `If a regional center proposes to deny, reduce, or end a service, it must give written notice explaining the decision and your appeal rights. You have the right to appeal and receive a fair hearing. Generally, appealing quickly matters: filing within the timeframe on your notice (historically 30 days to keep existing services in place during the appeal, known as "aid paid pending," and a longer window to appeal at all - recent law extended appeal deadlines, so check the dates printed on your notice). You can also request mediation or an informal meeting first without giving up the hearing. Free help is available from the Office of Clients' Rights Advocacy (OCRA).`,
+    citation: 'CA Welfare & Institutions Code §§ 4710.5, 4715, 4711.5, 4712 (as amended by AB 136)',
+    text: `If the regional center wants to say no to a service, cut it back, or end it, it must send you a written notice first. The notice must explain why and tell you how to appeal. You have 60 days from getting the notice to file your appeal with DDS, the Department of Developmental Services (you file with DDS, not with the regional center). Here is the most important deadline: if you appeal within 30 days, and before the change starts, your current services keep going unchanged while your appeal is decided. This is called aid paid pending, and it applies to services you already receive, not brand new requests. When you appeal, you can choose an informal meeting with the regional center, mediation with a neutral person, a fair hearing before an independent hearing officer, or all three, and you can change your mind along the way. The hearing happens within 50 days of your appeal and a final decision within 90 days. Appealing is your right, and using it cannot be held against you. Free help is available from the Office of Clients' Rights Advocacy (OCRA).`,
   },
   {
     id: 'ca-complaints',
@@ -102,15 +102,31 @@ export const CHUNKS = [
   },
 ]
 
-// Verified starter set from CA DDS / regional center published lists.
-// Partial list - full crosswalk lives at dds.ca.gov (Service Code Crosswalk).
+// Verified against DDS-published documents: the Feb 2026 Service Code
+// Crosswalk (RateReform_ServiceCode_Crosswalk_20260205.pdf) and the DDS-posted
+// rate-study service code listing. Partial list - the full crosswalk lives at
+// dds.ca.gov. Sorted by code so the table scans like the official lists.
 export const SERVICE_CODES = [
+  { code: '055', name: 'Community Integration Training Program', note: 'A day service that teaches skills out in the community instead of in a center.' },
   { code: '062', name: 'Personal Assistance', note: 'One-to-one assistance with daily activities, often in the home or community.' },
+  { code: '063', name: 'Community Activities Support Services', note: 'One-on-one or small group support to take part in community activities.' },
+  { code: '465', name: 'Participant-Directed Respite Services', note: 'Respite where the family picks and directs the respite worker themselves.' },
+  { code: '490', name: 'Financial Management Services (F/EA)', note: 'The fiscal agent that handles paychecks and taxes for participant-directed services; 491 is the co-employer version.' },
   { code: '505', name: 'Activity Center (Adult Day Program)', note: 'Day program focused on daily living and social skills. Settings Rule community-access rights apply.' },
   { code: '510', name: 'Adult Development Center (Adult Day Program)', note: 'Day program focused on developmental skill building. Settings Rule community-access rights apply.' },
+  { code: '520', name: 'Independent Living Program', note: 'Coaching to learn independent living skills like cooking, money, and getting around.' },
+  { code: '525', name: 'Social Recreation Program', note: 'Fun, social group activities; regional centers can fund social recreation again since July 2021.' },
+  { code: '531', name: 'Day Services', note: 'The new rate-reform day program code that programs like 505 and 510 are moving to; 532 is Behavioral Day Services and 533 is Medical Day Services.' },
+  { code: '612', name: 'Behavior Analyst', note: 'A certified behavior analyst who designs and oversees behavior support plans, including ABA-style services.' },
+  { code: '620', name: 'Behavior Management Consultant', note: 'A behavior specialist who consults on challenging behavior and trains the people who support the person.' },
+  { code: '805', name: 'Infant Development Program', note: 'Early Start services for babies and toddlers under 3, at home or in a center.' },
+  { code: '850', name: 'Camping Services', note: 'Camp and the travel to get there, restored as a fundable service in July 2021.' },
   { code: '862', name: 'In-Home Respite Services Agency', note: 'Temporary relief care in the family home, provided through a vendored agency.' },
   { code: '864', name: 'In-Home Respite Worker', note: 'Temporary relief care in the family home, provided by an individual worker.' },
   { code: '868', name: 'Out-of-Home Respite Services', note: 'Temporary care outside the family home, e.g. at a licensed facility.' },
+  { code: '875', name: 'Transportation Company', note: 'Rides to and from day programs and other regional center services, provided by a vendored transportation company.' },
+  { code: '896', name: 'Supported Living Services', note: 'Help with daily living so an adult can live in their own home, with support built around them.' },
+  { code: '952', name: 'Supported Employment (Individual)', note: 'A job coach who helps someone get and keep a regular job in the community; 950 is the group version.' },
 ]
 
 // --- State-aware layer -----------------------------------------------------
