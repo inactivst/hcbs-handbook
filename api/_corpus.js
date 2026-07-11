@@ -80,7 +80,13 @@ export const CHUNKS = [
     id: 'ca-appeals',
     title: 'California: appealing a regional center decision',
     citation: 'CA Welfare & Institutions Code §§ 4710.5, 4715, 4711.5, 4712 (as amended by AB 136)',
-    text: `If the regional center wants to say no to a service, cut it back, or end it, it must send you a written notice first. The notice must explain why and tell you how to appeal. You have 60 days from getting the notice to file your appeal with DDS, the Department of Developmental Services (you file with DDS, not with the regional center). Here is the most important deadline: if you appeal within 30 days, and before the change starts, your current services keep going unchanged while your appeal is decided. This is called aid paid pending, and it applies to services you already receive, not brand new requests. When you appeal, you can choose an informal meeting with the regional center, mediation with a neutral person, a fair hearing before an independent hearing officer, or all three, and you can change your mind along the way. The hearing happens within 50 days of your appeal and a final decision within 90 days. Appealing is your right, and using it cannot be held against you. Free help is available from the Office of Clients' Rights Advocacy (OCRA).`,
+    text: `If the regional center wants to say no to a service, cut it back, or end it, it must send you a written notice first. The notice must explain why and tell you how to appeal. You have 60 days from getting the notice to file your appeal with DDS, the Department of Developmental Services (you file with DDS, not with the regional center). Here is the most important deadline: if you appeal within 30 days, and before the change starts, your current services keep going unchanged while your appeal is decided. This is called aid paid pending, and it applies to services you already receive, not brand new requests. When you appeal, you can choose an informal meeting with the regional center, mediation with a neutral person, a fair hearing before an independent hearing officer, or all three, and you can change your mind along the way. The hearing happens within 50 days of your appeal and a final decision within 90 days, and the regional center must carry out a final decision within 30 days of it (WIC 4713.5). Appealing is your right, and using it cannot be held against you. Heads up: this appeal is only for services your regional center decides on. If instead Medi-Cal or your health plan denied something like in-home supportive services (IHSS), a wheelchair, or other medical equipment, that is a different appeal through the Department of Social Services, not this one. Free help is available from the Office of Clients' Rights Advocacy (OCRA).`,
+  },
+  {
+    id: 'ca-medical-appeals',
+    title: 'California: appealing a Medi-Cal service (not a regional center service)',
+    citation: 'Medi-Cal State Hearing; CA Dept of Social Services State Hearings Division; 42 CFR 431 Subpart E',
+    text: `California has two different appeal systems, and which one you use depends on who denied the service. If your regional center denied, cut, or ended a service (like respite, a day program, or supported living), you use the regional center appeal. But many supports come through Medi-Cal itself, not the regional center: in-home supportive services (IHSS), a wheelchair or other medical equipment, a Medi-Cal managed care plan decision, or services for someone under 21 through EPSDT. For those, you ask for a Medi-Cal State Hearing through the California Department of Social Services (CDSS), not the regional center and not DDS. You have 90 days from the date on your Notice of Action to ask. If you ask before the change takes effect (or within 10 days of the notice), your service usually keeps going while you wait for the decision. You can request a hearing by calling CDSS at 1-800-743-8525, or online, by mail, or by fax. Not sure which system is yours? Ask who authorized the service: your regional center, or Medi-Cal or your health plan.`,
   },
   {
     id: 'ca-complaints',
@@ -99,6 +105,18 @@ export const CHUNKS = [
     title: 'Rights in day programs and non-residential settings',
     citation: '42 CFR § 441.301(c)(4)(i)-(v)',
     text: `The Settings Rule applies to day programs, work activity programs, and other non-residential HCBS settings too. The five general requirements apply: community integration and access, individual choice of setting, privacy/dignity/no coercion or restraint, autonomy over activities and interactions, and choice of services and providers. The additional lease/food/visitor conditions apply only to provider-owned residential settings, but a day program still cannot regiment everyone into identical activities, isolate participants from the community, or restrict who participants interact with.`,
+  },
+  {
+    id: 'fed-fair-hearing',
+    title: 'Appealing a Medicaid service denial (your federal fair hearing right)',
+    citation: '42 USC 1396a(a)(3); 42 CFR §§ 431.221, 431.230, 431.244',
+    text: `In every state, if Medicaid denies, reduces, or stops a service you asked for or already get, you have the right to appeal. This is called a fair hearing, and it is a federal right that applies everywhere (42 USC 1396a(a)(3)). Each state sets the exact deadline to ask for a hearing, and it can be as long as 90 days from the date your notice is mailed, though some states or programs give you less time, so always check the deadline printed on your notice (42 CFR 431.221). Here is the part that protects you most: if you are already getting a service and you ask for the hearing before the change is set to take effect, your service usually keeps going unchanged until a decision is made (42 CFR 431.230). The state normally has to reach a final decision within about 90 days of your request (42 CFR 431.244); managed care plan appeals can move faster. You can bring a family member, friend, advocate, or lawyer, and using your appeal rights can never be held against you.`,
+  },
+  {
+    id: 'fed-epsdt',
+    title: 'Extra rights for children and youth under 21 (EPSDT)',
+    citation: '42 USC 1396d(r)(5); 42 USC 1396a(a)(43)',
+    text: `If you or your child is under 21 and has Medicaid (called Medi-Cal in California), there is a powerful extra right called EPSDT, which stands for Early and Periodic Screening, Diagnostic, and Treatment. Under EPSDT, a person under 21 can get any medically necessary service that Medicaid is allowed to cover if it is needed to correct or improve a health or developmental condition, even if that service is not normally covered for adults or is not on the usual service list (42 USC 1396d(r)(5)). In plain terms: for kids and young adults, "that is not a covered service" is often not the final answer if a doctor or clinician says the service is medically necessary. The state must tell families about EPSDT and help arrange the screenings and treatment (42 USC 1396a(a)(43)). If an EPSDT service is denied, you can appeal it through a Medicaid fair hearing.`,
   },
 ]
 
@@ -138,7 +156,7 @@ export const SERVICE_CODES = [
 // CHUNKS / SERVICE_CODES above are kept as-is for backward compatibility (the
 // Rights UI still imports them); they equal the federal base + the CA pack.
 
-const CA_CHUNK_IDS = new Set(['ca-lanterman-rights', 'ca-ipp', 'ca-appeals', 'ca-complaints', 'ca-hcbs-compliance'])
+const CA_CHUNK_IDS = new Set(['ca-lanterman-rights', 'ca-ipp', 'ca-appeals', 'ca-medical-appeals', 'ca-complaints', 'ca-hcbs-compliance'])
 
 // Federal chunks apply to all states.
 export const FEDERAL = CHUNKS.filter((c) => !CA_CHUNK_IDS.has(c.id))
