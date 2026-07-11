@@ -1090,6 +1090,9 @@ export default function App() {
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
       </div>
+      {/* Bottom fade: content dissolves into the background before it reaches the
+          floating nav, so cards never blend into the glass pill. */}
+      <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, height: 'calc(env(safe-area-inset-bottom) + 104px)', background: `linear-gradient(to top, ${C.bg} 42%, ${C.bg}D9 66%, ${C.bg}00)`, pointerEvents: 'none', zIndex: 40 }} />
       <Nav tab={tab} onAsk={startNew} onLibrary={() => setTab('library')} onVault={() => setShowVault(true)} />
       {!stateCode && <StatePrompt onChoose={chooseState} />}
       {showVault && (
@@ -1194,12 +1197,12 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
         style={{
           pointerEvents: 'auto',
           display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px',
-          background: 'rgba(255,255,255,0.72)',
-          backdropFilter: 'blur(14px) saturate(1.3)',
-          WebkitBackdropFilter: 'blur(14px) saturate(1.3)',
-          border: '1px solid rgba(43,42,40,0.08)',
+          background: 'rgba(255,255,255,0.86)',
+          backdropFilter: 'blur(18px) saturate(1.4)',
+          WebkitBackdropFilter: 'blur(18px) saturate(1.4)',
+          border: '1px solid rgba(43,42,40,0.12)',
           borderRadius: 999,
-          boxShadow: '0 8px 28px rgba(43,42,40,0.16)',
+          boxShadow: '0 12px 34px rgba(43,42,40,0.22), 0 2px 8px rgba(43,42,40,0.10)',
         }}
       >
         {pill(t('navAsk'), tab === 'chat', onAsk)}
