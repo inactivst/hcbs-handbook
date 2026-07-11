@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FEDERAL, STATES, US_STATES } from '../api/_corpus.js'
+import { useCloud, mergeConversations } from './cloud.js'
 
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
@@ -801,6 +802,8 @@ export default function App() {
     try { localStorage.setItem(STATE_KEY, code) } catch { /* just won't persist */ }
   }
 
+  const cloud = useCloud()
+
   useGlobalFieldRecenter()
 
   useEffect(() => {
@@ -810,6 +813,38 @@ export default function App() {
       /* storage full or unavailable - history just won't persist */
     }
   }, [conversations])
+
+  // ─── Cloud history sync (only when a user is signed in + unlocked) ──────────
+  // On the transition to 'ready', pull the account's encrypted history, merge it
+  // with what is on this device, and seed the cloud with the union. Runs once
+  // per unlock; resets when the vault locks/signs out.
+  const reconciledRef = useRef(false)
+  useEffect(() => {
+    if (cloud.status !== 'ready') { reconciledRef.current = false; return }
+    if (reconciledRef.current) return
+    reconciledRef.current = true
+    let alive = true
+    ;(async () => {
+      const cloudConvs = await cloud.pullConversations()
+      if (!alive) return
+      setConversations((prev) => {
+        const merged = mergeConversations(prev, cloudConvs).slice(0, MAX_CONVERSATIONS)
+        cloud.pushConversations(merged) // seed/refresh the account with the union
+        return merged
+      })
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloud.status])
+
+  // After reconcile, push local changes up (debounced) so new questions persist
+  // to the account. No-op when signed out — history then stays device-only.
+  useEffect(() => {
+    if (cloud.status !== 'ready' || !reconciledRef.current) return
+    const t = setTimeout(() => cloud.pushConversations(conversations), 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversations, cloud.status])
 
   const activeMessages = (activeId ? conversations.find((c) => c.id === activeId)?.messages : null) || []
 
@@ -928,7 +963,7 @@ export default function App() {
     // only the inner scroll areas move.
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header onSettings={() => setShowSettings(true)} onCloud={() => setShowCloud(true)} />
+        <Header onSettings={() => setShowSettings(true)} onCloud={() => setShowCloud(true)} connected={cloud.status === 'ready'} />
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
         {tab === 'history' && <History conversations={conversations} onOpen={openConversation} onDelete={deleteConversation} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
@@ -942,7 +977,7 @@ export default function App() {
           onDeleteAll={deleteAllConversations}
         />
       )}
-      {showCloud && <CloudSheet onClose={() => setShowCloud(false)} />}
+      {showCloud && <CloudSheet onClose={() => setShowCloud(false)} cloud={cloud} />}
     </div>
   )
 }
@@ -966,7 +1001,7 @@ function IconBtn({ label, onClick, children }) {
   )
 }
 
-function Header({ onSettings, onCloud }) {
+function Header({ onSettings, onCloud, connected }) {
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0', flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
@@ -975,7 +1010,14 @@ function Header({ onSettings, onCloud }) {
           <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>Your HCBS rights, in plain language</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, paddingTop: 2 }}>
-          <IconBtn label="Cloud sync" onClick={onCloud}><IcCloud size={19} /></IconBtn>
+          <IconBtn label={connected ? 'Account (synced)' : 'Cloud sync'} onClick={onCloud}>
+            <span style={{ position: 'relative', display: 'inline-flex' }}>
+              <IcCloud size={19} style={connected ? { color: C.accent } : undefined} />
+              {connected && (
+                <span style={{ position: 'absolute', right: -3, top: -2, width: 7, height: 7, borderRadius: '50%', background: C.accent, border: `1.5px solid ${C.surface}` }} />
+              )}
+            </span>
+          </IconBtn>
           <IconBtn label="Settings" onClick={onSettings}><IcSettings size={19} /></IconBtn>
         </div>
       </div>
@@ -1554,20 +1596,145 @@ function StatePrompt({ onChoose }) {
   )
 }
 
-function CloudSheet({ onClose }) {
+// Primary/secondary buttons for the account flow (match the app's field tokens).
+const cloudBtn = (kind = 'primary') => ({
+  width: '100%', boxSizing: 'border-box', border: 'none', cursor: 'pointer',
+  borderRadius: 12, padding: '13px 16px', fontSize: 15, fontWeight: 700,
+  fontFamily: 'inherit',
+  ...(kind === 'primary'
+    ? { background: C.accent, color: '#fff' }
+    : { background: C.surface, color: C.ink, border: `1px solid ${C.border}` }),
+})
+
+// A fixed-height status/error line so text appearing never reflows the sheet
+// (feedback-popup-text-no-reflow).
+function CloudNote({ error }) {
   return (
-    <Modal onClose={onClose} title="Cloud sync">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ display: 'inline-flex', width: 8, height: 8, borderRadius: '50%', background: C.lineHard }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: C.sub }}>Not connected</span>
-      </div>
-      <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 4 }}>
-        HandBook works fully on this device without an account - nothing you do here requires one.
-      </div>
-      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
-        Optional accounts are coming soon. Signing in will add extras like keeping your saved questions
-        indefinitely across devices - and everything will stay private to you.
-      </div>
+    <div style={{ minHeight: 18, margin: '10px 2px 0', fontSize: 13, lineHeight: 1.35, color: C.danger, opacity: error ? 1 : 0, transition: 'opacity 0.15s' }}>
+      {error || ' '}
+    </div>
+  )
+}
+
+function CloudSheet({ onClose, cloud }) {
+  const { status, pinMode, email, error, busy } = cloud
+  const [emailInput, setEmailInput] = useState(email || '')
+  const [code, setCode] = useState('')
+  const [pin, setPin] = useState('')
+
+  // Configuration missing (no Supabase env) - keep the honest coming-soon copy.
+  if (status === 'off') {
+    return (
+      <Modal onClose={onClose} title="Account">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+          <span style={{ display: 'inline-flex', width: 8, height: 8, borderRadius: '50%', background: C.lineHard }} />
+          <span style={{ fontSize: 14, fontWeight: 600, color: C.sub }}>Not connected</span>
+        </div>
+        <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 4 }}>
+          HandBook works fully on this device without an account - nothing you do here requires one.
+        </div>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
+          Optional accounts are coming soon. Signing in will keep your saved questions indefinitely
+          across devices - and everything stays private to you.
+        </div>
+      </Modal>
+    )
+  }
+
+  const pinCopy = {
+    setup: { title: 'Create a PIN', sub: 'This 4-digit PIN encrypts your history. Only you can unlock it - we can never read it, so keep it somewhere safe.', cta: 'Set PIN' },
+    unlock: { title: 'Enter your PIN', sub: 'Unlock your saved history on this device.', cta: 'Unlock' },
+    recover: { title: 'Enter your PIN', sub: 'Enter the PIN you created to restore your history on this device.', cta: 'Restore' },
+  }[pinMode] || {}
+
+  return (
+    <Modal onClose={onClose} title="Account">
+      {status === 'signed_out' && (
+        <div>
+          <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 4 }}>
+            Sign in to keep your saved questions indefinitely and across devices. Everything is
+            end-to-end encrypted - private to you.
+          </div>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>
+            HandBook works fully without an account; this only adds cloud history.
+          </div>
+          <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>Email</label>
+          <input
+            type="email" inputMode="email" autoComplete="email" placeholder="you@example.com"
+            value={emailInput} onChange={(e) => setEmailInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') cloud.sendCode(emailInput) }}
+            style={{ ...inputStyle, fontSize: 16 }}
+          />
+          <CloudNote error={error} />
+          <button disabled={busy} onClick={() => cloud.sendCode(emailInput)} style={{ ...cloudBtn('primary'), marginTop: 12, opacity: busy ? 0.6 : 1 }}>
+            {busy ? 'Sending…' : 'Email me a code'}
+          </button>
+        </div>
+      )}
+
+      {status === 'code_sent' && (
+        <div>
+          <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 16 }}>
+            We sent a 6-digit code to <strong>{email}</strong>. Enter it below.
+          </div>
+          <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>Code</label>
+          <input
+            type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={6}
+            value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+            onKeyDown={(e) => { if (e.key === 'Enter') cloud.verifyCode(code) }}
+            style={{ ...inputStyle, fontSize: 16, letterSpacing: 4, textAlign: 'center' }}
+          />
+          <CloudNote error={error} />
+          <button disabled={busy} onClick={() => cloud.verifyCode(code)} style={{ ...cloudBtn('primary'), marginTop: 12, opacity: busy ? 0.6 : 1 }}>
+            {busy ? 'Verifying…' : 'Verify'}
+          </button>
+          <button onClick={() => cloud.restart()} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>
+            Use a different email
+          </button>
+        </div>
+      )}
+
+      {status === 'need_pin' && (
+        <div>
+          <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{pinCopy.title}</div>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>{pinCopy.sub}</div>
+          <input
+            type="password" inputMode="numeric" autoComplete="off" placeholder="••••" maxLength={4}
+            value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+            onKeyDown={(e) => { if (e.key === 'Enter' && pin.length === 4) cloud.submitPin(pin) }}
+            style={{ ...inputStyle, fontSize: 22, letterSpacing: 10, textAlign: 'center' }}
+          />
+          <CloudNote error={error} />
+          <button
+            disabled={busy || pin.length !== 4}
+            onClick={() => cloud.submitPin(pin)}
+            style={{ ...cloudBtn('primary'), marginTop: 12, opacity: (busy || pin.length !== 4) ? 0.6 : 1 }}
+          >
+            {busy ? 'Working…' : pinCopy.cta}
+          </button>
+          <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>
+            Sign out
+          </button>
+        </div>
+      )}
+
+      {status === 'ready' && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <span style={{ display: 'inline-flex', width: 8, height: 8, borderRadius: '50%', background: C.accent }} />
+            <span style={{ fontSize: 14, fontWeight: 600, color: C.accent }}>Synced</span>
+          </div>
+          <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 4 }}>
+            Signed in as <strong>{email}</strong>. Your history is saved to your account and
+            encrypted so only you can read it.
+          </div>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>
+            Lock hides your history until you re-enter your PIN. Sign out removes it from this device.
+          </div>
+          <button onClick={() => { cloud.lock(); onClose() }} style={cloudBtn('secondary')}>Lock</button>
+          <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 8, color: C.danger }}>Sign out</button>
+        </div>
+      )}
     </Modal>
   )
 }
