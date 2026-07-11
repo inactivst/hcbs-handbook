@@ -180,10 +180,35 @@ function useKeyboardInset() {
       if (vv.height > maxH) maxH = vv.height
       setInset(Math.max(0, Math.min(maxH - vv.height, maxH * 0.6)))
     }
+    // Returning from background delivers NO visualViewport resize even though the
+    // keyboard closed while suspended, so the inset stays stuck at keyboard height
+    // (dead gap above the nav) and any scroll the OS applied to the layout viewport
+    // sticks too (taps land offset - feels frozen). Re-sync on every resume path,
+    // then once more after iOS finishes settling the viewport.
+    let resumeTimer = null
+    const resync = () => {
+      if (window.scrollY || window.scrollX) window.scrollTo(0, 0)
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+      update()
+      clearTimeout(resumeTimer)
+      resumeTimer = setTimeout(update, 250)
+    }
+    const onVis = () => { if (document.visibilityState === 'visible') resync() }
     vv.addEventListener('resize', update)
     vv.addEventListener('scroll', update)
+    window.addEventListener('pageshow', resync)
+    window.addEventListener('focus', resync)
+    document.addEventListener('visibilitychange', onVis)
     update()
-    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update) }
+    return () => {
+      clearTimeout(resumeTimer)
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+      window.removeEventListener('pageshow', resync)
+      window.removeEventListener('focus', resync)
+      document.removeEventListener('visibilitychange', onVis)
+    }
   }, [])
   return inset
 }
