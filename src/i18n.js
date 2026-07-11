@@ -193,6 +193,16 @@ const STRINGS = {
     packetPrint: 'Print / Save as PDF',
     packetFooter: 'Prepared with HandBook. General information, not legal advice.',
     packetOpenFailed: 'Could not open the packet. Please allow pop-ups and try again.',
+    // Documents & photos
+    docsTitle: 'Documents & photos',
+    docsSub: 'Store IPP pages, notices, and evidence photos - encrypted so only you can open them.',
+    addDoc: 'Add photo or document',
+    docsEmpty: 'Nothing stored yet. Add a photo of a notice, an IPP page, or any document you want to keep safe.',
+    docUploading: 'Encrypting and uploading…',
+    docTooBig: 'That file is too large (max 25 MB).',
+    docUploadFailed: 'Upload failed. Please try again.',
+    docOpenFailed: 'Could not open that file.',
+    docFile: 'File',
   },
   es: {
     tagline: 'Tus derechos de HCBS, en lenguaje sencillo',
@@ -368,6 +378,16 @@ const STRINGS = {
     packetPrint: 'Imprimir / Guardar como PDF',
     packetFooter: 'Preparado con HandBook. Información general, no asesoría legal.',
     packetOpenFailed: 'No se pudo abrir el paquete. Permite las ventanas emergentes e intenta de nuevo.',
+    // Documents & photos
+    docsTitle: 'Documentos y fotos',
+    docsSub: 'Guarda páginas del IPP, avisos y fotos de evidencia, cifrados para que solo tú puedas abrirlos.',
+    addDoc: 'Agregar foto o documento',
+    docsEmpty: 'Aún no hay nada guardado. Agrega una foto de un aviso, una página del IPP o cualquier documento que quieras mantener seguro.',
+    docUploading: 'Cifrando y subiendo…',
+    docTooBig: 'Ese archivo es demasiado grande (máx. 25 MB).',
+    docUploadFailed: 'La subida falló. Por favor intenta de nuevo.',
+    docOpenFailed: 'No se pudo abrir ese archivo.',
+    docFile: 'Archivo',
   },
   tl: {
     tagline: 'Ang iyong mga karapatan sa HCBS, sa simpleng wika',
@@ -543,6 +563,16 @@ const STRINGS = {
     packetPrint: 'I-print / I-save bilang PDF',
     packetFooter: 'Ginawa gamit ang HandBook. Pangkalahatang impormasyon, hindi legal na payo.',
     packetOpenFailed: 'Hindi mabuksan ang packet. Payagan ang pop-up at subukang muli.',
+    // Documents & photos
+    docsTitle: 'Mga dokumento at larawan',
+    docsSub: 'Mag-imbak ng mga pahina ng IPP, notice, at larawan ng ebidensya, naka-encrypt para ikaw lang ang makakabukas.',
+    addDoc: 'Magdagdag ng larawan o dokumento',
+    docsEmpty: 'Wala pang naka-imbak. Magdagdag ng larawan ng isang notice, pahina ng IPP, o anumang dokumentong gusto mong itago nang ligtas.',
+    docUploading: 'Ini-encrypt at ina-upload…',
+    docTooBig: 'Masyadong malaki ang file na iyan (max 25 MB).',
+    docUploadFailed: 'Nabigo ang pag-upload. Pakisubukang muli.',
+    docOpenFailed: 'Hindi mabuksan ang file na iyan.',
+    docFile: 'File',
   },
 }
 

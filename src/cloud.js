@@ -9,7 +9,7 @@ import { supabase } from './supabase.js'
 import { tr } from './i18n.js'
 import {
   createVaultKey, wrapVaultKeyWithPin, unwrapVaultKeyWithPin,
-  encryptStr, decryptStr, newSalt, saltToB64, saltFromB64,
+  encryptStr, decryptStr, encryptBytes, decryptBytes, newSalt, saltToB64, saltFromB64,
   localPin, localSalt, localEmail,
 } from './vault.js'
 
@@ -228,12 +228,45 @@ export function useCloud() {
   const pushConversations = useCallback((list) => pushItems('history', list), [pushItems])
   const pullConversations = useCallback(() => pullItems('history'), [pullItems])
 
+  // ─── Vault file storage (E2E) ───────────────────────────────────────────────
+  // File bytes are encrypted client-side, then uploaded to the private `vault`
+  // bucket under {uid}/{name}. The server stores only ciphertext; RLS keeps each
+  // user inside their own folder. `name` is the file's UUID (full) or UUID.t
+  // (thumbnail). Returns true/false so callers can surface upload failures.
+  const uploadBytes = useCallback(async (name, arrayBuffer) => {
+    const key = keyRef.current, user = userRef.current
+    if (!key || !user || !supabase) return false
+    try {
+      const enc = await encryptBytes(arrayBuffer, key)
+      const { error: e } = await supabase.storage.from('vault')
+        .upload(`${user.id}/${name}`, new Blob([enc], { type: 'application/octet-stream' }), { upsert: true })
+      return !e
+    } catch { return false }
+  }, [])
+
+  const downloadBytes = useCallback(async (name) => {
+    const key = keyRef.current, user = userRef.current
+    if (!key || !user || !supabase) return null
+    try {
+      const { data, error: e } = await supabase.storage.from('vault').download(`${user.id}/${name}`)
+      if (e || !data) return null
+      return await decryptBytes(await data.arrayBuffer(), key)
+    } catch { return null }
+  }, [])
+
+  const removeBytes = useCallback(async (names) => {
+    const user = userRef.current
+    if (!user || !supabase || !names?.length) return
+    try { await supabase.storage.from('vault').remove(names.map((n) => `${user.id}/${n}`)) } catch { /* leaves orphan object; row already gone */ }
+  }, [])
+
   return {
     status, pinMode, email, error, busy,
     setEmail, setError,
     sendCode, verifyCode, submitPin, lock, signOut, restart,
     pushConversations, pullConversations,
     pushItems, pullItems, deleteItem,
+    uploadBytes, downloadBytes, removeBytes,
     hasKey: () => !!keyRef.current,
   }
 }

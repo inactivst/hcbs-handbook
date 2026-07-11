@@ -81,6 +81,27 @@ export const decryptStr = async (val, key) => {
   } catch { return null; }
 };
 
+// Binary file encryption (photos, documents) under the same vault key. Layout:
+// [12-byte IV][AES-GCM ciphertext]. Returns a Uint8Array the caller wraps in a
+// Blob to upload - the server only ever stores this ciphertext, never the file.
+export const encryptBytes = async (arrayBuffer, key) => {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, arrayBuffer);
+  const out = new Uint8Array(12 + ct.byteLength);
+  out.set(iv, 0);
+  out.set(new Uint8Array(ct), 12);
+  return out;
+};
+
+// Inverse of encryptBytes. Throws on a bad key / tampered ciphertext - callers
+// must catch and treat it as "could not read".
+export const decryptBytes = async (bytes, key) => {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  const iv = u8.subarray(0, 12);
+  const ct = u8.subarray(12);
+  return crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ct);
+};
+
 // Derive the PIN wrapping key + wrap/unwrap the vault key. Thin wrappers so the
 // PIN string and salt never leak past this module.
 export const wrapVaultKeyWithPin = async (vaultKey, pin, salt) =>

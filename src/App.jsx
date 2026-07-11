@@ -135,6 +135,20 @@ const IcTrash = ({ size = 24, style }) => (
     <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </SvgIcon>
 )
+const IcDoc = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+  </SvgIcon>
+)
+
+// Compact human byte size (e.g. "2.4 MB") for the document rows.
+const formatBytes = (n) => {
+  if (!n || n < 1024) return `${n || 0} B`
+  const kb = n / 1024
+  if (kb < 1024) return `${Math.round(kb)} KB`
+  return `${(kb / 1024).toFixed(1)} MB`
+}
 
 // ─── FIELD STYLE (GuestBook restyle: white well + real border + inset shadow;
 // the teal focus ring lives in index.html) ─────────────────────────────────────
@@ -891,6 +905,7 @@ export default function App() {
   // moment the vault locks. Never persisted plaintext on the device.
   const incidents = useVaultCollection(cloud, 'incident', incidentSort)
   const deadlines = useVaultCollection(cloud, 'deadline', deadlineSort)
+  const vaultDocs = useVaultDocs(cloud)
 
   const activeMessages = (activeId ? conversations.find((c) => c.id === activeId)?.messages : null) || []
 
@@ -1025,6 +1040,7 @@ export default function App() {
             deadlines={deadlines.items}
             onSaveDeadline={deadlines.save}
             onDeleteDeadline={deadlines.remove}
+            vaultDocs={vaultDocs}
             onOpenAccount={() => setShowCloud(true)}
             isCA={(stateCode || 'CA') === 'CA'}
           />
@@ -1753,6 +1769,181 @@ function openPacket(incidents, t, isCA) {
   return true
 }
 
+// ─── VAULT DOCUMENTS & PHOTOS (E2E; file bytes in the private storage bucket) ──
+const MAX_DOC_BYTES = 25 * 1024 * 1024 // matches the bucket's file_size_limit
+const docSort = (list) => [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+
+// Shrink an image to a ~400px WebP thumbnail (media pipeline: the grid pulls
+// thumbnails, not full files). EXIF orientation is honored so phone photos are
+// upright. Returns an ArrayBuffer, or null if the file isn't a decodable image.
+async function makeThumbnail(file, max = 400) {
+  try {
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+    const scale = Math.min(1, max / Math.max(bmp.width, bmp.height))
+    const w = Math.max(1, Math.round(bmp.width * scale))
+    const h = Math.max(1, Math.round(bmp.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = w; canvas.height = h
+    canvas.getContext('2d').drawImage(bmp, 0, 0, w, h)
+    bmp.close?.()
+    const blob = await new Promise((res) => canvas.toBlob(res, 'image/webp', 0.8))
+    return blob ? await blob.arrayBuffer() : null
+  } catch { return null }
+}
+
+// Metadata lives in vault_items (kind='doc', encrypted); the file + thumbnail
+// bytes live in the storage bucket (encrypted). Loaded on unlock, cleared on
+// lock. add() needs the id before upload, so it can't use useVaultCollection.
+function useVaultDocs(cloud) {
+  const [docs, setDocs] = useState([])
+  const [busy, setBusy] = useState(false)
+  const loadedRef = useRef(false)
+  useEffect(() => {
+    if (cloud.status !== 'ready') { loadedRef.current = false; setDocs([]); return }
+    let alive = true
+    ;(async () => {
+      const list = await cloud.pullItems('doc')
+      if (!alive) return
+      setDocs(docSort(list)); loadedRef.current = true
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloud.status])
+  useEffect(() => {
+    if (cloud.status !== 'ready' || !loadedRef.current) return
+    const t = setTimeout(() => cloud.pushItems('doc', docs), 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docs, cloud.status])
+
+  const add = useCallback(async (file) => {
+    if (!file) return { error: 'read' }
+    if (file.size > MAX_DOC_BYTES) return { error: 'big' }
+    setBusy(true)
+    try {
+      const buf = await file.arrayBuffer()
+      const id = genId()
+      const isImage = /^image\//.test(file.type || '')
+      if (!(await cloud.uploadBytes(id, buf))) return { error: 'upload' }
+      let hasThumb = false
+      if (isImage) {
+        const thumb = await makeThumbnail(file)
+        if (thumb) hasThumb = await cloud.uploadBytes(`${id}.t`, thumb)
+      }
+      const rec = { id, name: file.name || '', mime: file.type || '', size: file.size, at: todayISO(), isImage, hasThumb, createdAt: Date.now() }
+      setDocs((prev) => docSort([rec, ...prev]))
+      return { ok: true }
+    } catch { return { error: 'read' } }
+    finally { setBusy(false) }
+  }, [cloud])
+
+  const remove = useCallback((doc) => {
+    setDocs((prev) => prev.filter((d) => d.id !== doc.id))
+    cloud.deleteItem(doc.id)
+    cloud.removeBytes(doc.hasThumb ? [doc.id, `${doc.id}.t`] : [doc.id])
+  }, [cloud])
+
+  return { docs, busy, add, remove }
+}
+
+// One grid/list thumbnail: lazy-loads + decrypts its thumb only once scrolled
+// near view (IntersectionObserver), and revokes the blob URL on unmount so a
+// long vault never piles up object URLs.
+function DocThumb({ doc, cloud }) {
+  const [url, setUrl] = useState(null)
+  const [inView, setInView] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el || inView) return
+    const io = new IntersectionObserver((es) => {
+      if (es.some((e) => e.isIntersecting)) { setInView(true); io.disconnect() }
+    }, { rootMargin: '200px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [inView])
+  useEffect(() => {
+    if (!inView || !doc.isImage || !doc.hasThumb) return
+    let alive = true, objUrl
+    ;(async () => {
+      const bytes = await cloud.downloadBytes(`${doc.id}.t`)
+      if (!alive || !bytes) return
+      objUrl = URL.createObjectURL(new Blob([bytes], { type: 'image/webp' }))
+      setUrl(objUrl)
+    })()
+    return () => { alive = false; if (objUrl) URL.revokeObjectURL(objUrl) }
+  }, [inView, doc, cloud])
+  const box = { width: 46, height: 46, flexShrink: 0, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', color: C.ink3 }
+  if (doc.isImage && url) return <div ref={ref} style={box}><img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
+  return <div ref={ref} style={box}><IcDoc size={20} /></div>
+}
+
+function DocsSection({ cloud, docs, busy, onAdd, onRemove }) {
+  const t = useT()
+  const [error, setError] = useState('')
+  const inputRef = useRef(null)
+
+  const onPick = async (e) => {
+    setError('')
+    const files = Array.from(e.target.files || [])
+    e.target.value = '' // allow re-picking the same file
+    for (const f of files) {
+      const r = await onAdd(f)
+      if (r?.error) { setError(t(r.error === 'big' ? 'docTooBig' : 'docUploadFailed')); break }
+    }
+  }
+  const openDoc = async (doc) => {
+    setError('')
+    const bytes = await cloud.downloadBytes(doc.id)
+    if (!bytes) { setError(t('docOpenFailed')); return }
+    const url = URL.createObjectURL(new Blob([bytes], { type: doc.mime || 'application/octet-stream' }))
+    if (!window.open(url, '_blank')) { URL.revokeObjectURL(url); setError(t('docOpenFailed')); return }
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  }
+
+  return (
+    <>
+      <SectionTitle>{t('docsTitle')}</SectionTitle>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('docsSub')}</div>
+      <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple onChange={onPick} style={{ display: 'none' }} />
+      <button disabled={busy} onClick={() => inputRef.current?.click()} style={{ ...cloudBtn('primary'), marginBottom: 8, opacity: busy ? 0.6 : 1 }}>
+        {busy ? t('docUploading') : t('addDoc')}
+      </button>
+      <CloudNote error={error} />
+      {docs.length === 0 ? (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55, marginTop: 6 }}>
+          {t('docsEmpty')}
+        </div>
+      ) : (
+        docs.map((doc) => (
+          <SwipeableRow
+            key={doc.id}
+            onTap={() => openDoc(doc)}
+            actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onRemove(doc) }]}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)', padding: '10px 12px' }}>
+              <DocThumb doc={doc} cloud={cloud} />
+              <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || t('docFile')}</div>
+                <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{doc.at} · {formatBytes(doc.size)}</div>
+              </div>
+              {!IS_TOUCH && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRemove(doc) }}
+                  aria-label={t('delete')}
+                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, background: 'transparent', border: 'none', color: C.sub, cursor: 'pointer' }}
+                >
+                  <IcTrash size={16} />
+                </button>
+              )}
+            </div>
+          </SwipeableRow>
+        ))
+      )}
+    </>
+  )
+}
+
 function IncidentSheet({ initial, onSave, onClose }) {
   const t = useT()
   const [at, setAt] = useState(initial?.at || todayISO())
@@ -1887,7 +2078,7 @@ function ContactsCard({ isCA }) {
   )
 }
 
-function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, onOpenAccount, isCA }) {
+function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
   const t = useT()
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
@@ -2003,6 +2194,14 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
           ) : (
             deadlines.map(deadlineRow)
           )}
+          <DocsSection
+            cloud={cloud}
+            docs={vaultDocs.docs}
+            busy={vaultDocs.busy}
+            onAdd={vaultDocs.add}
+            onRemove={vaultDocs.remove}
+          />
+
           <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
         </>
       )}
