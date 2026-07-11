@@ -141,6 +141,37 @@ const IcDoc = ({ size = 24, style }) => (
     <polyline points="14 2 14 8 20 8" />
   </SvgIcon>
 )
+// ─── Vault tile icons ─────────────────────────────────────────────────────────
+const IcClipboard = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <rect x="8" y="2" width="8" height="4" rx="1" />
+    <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
+    <path d="M9 12h6" /><path d="M9 16h4" />
+  </SvgIcon>
+)
+const IcClock = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+  </SvgIcon>
+)
+const IcImage = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
+  </SvgIcon>
+)
+const IcFileText = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+    <line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="14" y2="17" />
+  </SvgIcon>
+)
+const IcPhone = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
+  </SvgIcon>
+)
 
 // Compact human byte size (e.g. "2.4 MB") for the document rows.
 const formatBytes = (n) => {
@@ -2087,8 +2118,39 @@ function ContactsCard({ isCA }) {
   )
 }
 
+// One home-screen tile: big icon in a soft disc, short label, one-line status.
+// Visual + minimal words - the vault reads as an app, not a wall of text.
+function VaultTile({ icon, label, sub, onClick }) {
+  return (
+    <button onClick={onClick} style={{
+      background: C.card, border: `1px solid ${C.border}`, borderRadius: 16,
+      boxShadow: '0 1px 2px rgba(43,42,40,0.04)', cursor: 'pointer',
+      padding: '15px 14px', textAlign: 'left', display: 'flex', flexDirection: 'column',
+      minHeight: 118, fontFamily: 'inherit',
+    }}>
+      <span style={{ width: 42, height: 42, borderRadius: 12, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</span>
+      <span style={{ marginTop: 'auto', paddingTop: 10 }}>
+        <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: C.ink, lineHeight: 1.2 }}>{label}</span>
+        <span style={{ display: 'block', fontSize: 12, color: C.sub, marginTop: 3 }}>{sub}</span>
+      </span>
+    </button>
+  )
+}
+
+// Labeled back control for a vault drill-in (clear text, not a bare chevron -
+// intuitive for every user).
+function VaultBack({ onBack }) {
+  const t = useT()
+  return (
+    <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'none', border: 'none', color: C.accent, fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: '2px 2px 2px 0', marginBottom: 6, fontFamily: 'inherit' }}>
+      <IcChevron dir="left" size={18} /> {t('navVault')}
+    </button>
+  )
+}
+
 function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
   const t = useT()
+  const [view, setView] = useState('hub') // hub | incidents | deadlines | documents | packet | contacts
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const [packetError, setPacketError] = useState('')
@@ -2098,6 +2160,38 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
     setPacketError('')
     if (!openPacket(incidents, t, isCA)) setPacketError(t('packetOpenFailed'))
   }
+
+  const scroll = { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }
+  const emptyCard = (text) => (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>{text}</div>
+  )
+  const countText = (n) => (n > 0 ? t('countSaved', { n }) : t('tileEmpty'))
+
+  const incidentRow = (inc) => (
+    <SwipeableRow
+      key={inc.id}
+      onTap={() => setEditing(inc)}
+      actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDeleteIncident(inc.id) }]}
+    >
+      <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.what}</div>
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {inc.at}{inc.where ? ` · ${inc.where}` : ''}{inc.who ? ` · ${inc.who}` : ''}
+          </div>
+        </div>
+        {!IS_TOUCH && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDeleteIncident(inc.id) }}
+            aria-label={t('delete')}
+            style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, background: 'transparent', border: 'none', borderLeft: `1px solid ${C.line}`, color: C.sub, cursor: 'pointer' }}
+          >
+            <IcTrash size={16} />
+          </button>
+        )}
+      </div>
+    </SwipeableRow>
+  )
 
   const deadlineRow = (rec) => {
     const due = addDaysISO(rec.notice, deadlineDays(rec))
@@ -2137,100 +2231,108 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
     )
   }
 
-  return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
-      <SectionTitle first>{t('incidentLog')}</SectionTitle>
-      {!ready ? (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+  // Signed out: sign-in prompt + the public help lines (crisis help never needs
+  // an account).
+  if (!ready) {
+    return (
+      <div style={scroll}>
+        <SectionTitle first>{t('navVault')}</SectionTitle>
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '18px 16px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)', marginBottom: 22 }}>
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
           <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
         </div>
-      ) : (
-        <>
-          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('incidentSub')}</div>
-          <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
-          {incidents.length === 0 ? (
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
-              {t('vaultEmptyList')}
-            </div>
-          ) : (
-            incidents.map((inc) => (
-              <SwipeableRow
-                key={inc.id}
-                onTap={() => setEditing(inc)}
-                actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDeleteIncident(inc.id) }]}
-              >
-                <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
-                  <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
-                    <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.what}</div>
-                    <div style={{ fontSize: 12, color: C.sub, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {inc.at}{inc.where ? ` · ${inc.where}` : ''}{inc.who ? ` · ${inc.who}` : ''}
-                    </div>
-                  </div>
-                  {!IS_TOUCH && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onDeleteIncident(inc.id) }}
-                      aria-label={t('delete')}
-                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, background: 'transparent', border: 'none', borderLeft: `1px solid ${C.line}`, color: C.sub, cursor: 'pointer' }}
-                    >
-                      <IcTrash size={16} />
-                    </button>
-                  )}
-                </div>
-              </SwipeableRow>
-            ))
-          )}
-          <SectionTitle>{t('packet')}</SectionTitle>
-          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('packetSub')}</div>
-          {incidents.length === 0 ? (
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
-              {t('packetNeedIncident')}
-            </div>
-          ) : (
-            <>
-              <button onClick={makePacket} style={cloudBtn('primary')}>{t('createPacket')}</button>
-              <CloudNote error={packetError} />
-            </>
-          )}
+        <SectionTitle>{t('helpContacts')}</SectionTitle>
+        <ContactsCard isCA={isCA} />
+      </div>
+    )
+  }
 
-          <SectionTitle>{t('appealDeadlines')}</SectionTitle>
-          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
-          <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
-          {deadlines.length === 0 ? (
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
-              {t('vaultEmptyDl')}
-            </div>
-          ) : (
-            deadlines.map(deadlineRow)
-          )}
-          <DocsSection
-            cloud={cloud}
-            docs={vaultDocs.docs}
-            busy={vaultDocs.busy}
-            onAdd={vaultDocs.add}
-            onRemove={vaultDocs.remove}
-          />
-
-          <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
-        </>
-      )}
-      <SectionTitle>{t('helpContacts')}</SectionTitle>
-      <ContactsCard isCA={isCA} />
+  const sheets = (
+    <>
       {editing && (
-        <IncidentSheet
-          initial={editing === 'new' ? null : editing}
-          onSave={onSaveIncident}
-          onClose={() => setEditing(null)}
-        />
+        <IncidentSheet initial={editing === 'new' ? null : editing} onSave={onSaveIncident} onClose={() => setEditing(null)} />
       )}
       {editingDl && (
-        <DeadlineSheet
-          initial={editingDl === 'new' ? null : editingDl}
-          onSave={onSaveDeadline}
-          onClose={() => setEditingDl(null)}
-          isCA={isCA}
-        />
+        <DeadlineSheet initial={editingDl === 'new' ? null : editingDl} onSave={onSaveDeadline} onClose={() => setEditingDl(null)} isCA={isCA} />
       )}
+    </>
+  )
+
+  // ── Hub: a grid of tiles, one per tool. Visual, minimal words. ──────────────
+  if (view === 'hub') {
+    return (
+      <div style={scroll}>
+        <SectionTitle first>{t('navVault')}</SectionTitle>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, marginBottom: 14 }}>{t('vaultHubSub')}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setView('incidents')} />
+          <VaultTile icon={<IcClock size={22} />} label={t('appealDeadlines')} sub={countText(deadlines.length)} onClick={() => setView('deadlines')} />
+          <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setView('documents')} />
+          <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setView('packet')} />
+          <VaultTile icon={<IcPhone size={22} />} label={t('helpContacts')} sub={t('tileContactsSub')} onClick={() => setView('contacts')} />
+        </div>
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
+      </div>
+    )
+  }
+
+  // ── Drill-in views ─────────────────────────────────────────────────────────
+  if (view === 'incidents') {
+    return (
+      <div style={scroll}>
+        <VaultBack onBack={() => setView('hub')} />
+        <SectionTitle>{t('incidentLog')}</SectionTitle>
+        <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
+        {incidents.length === 0 ? emptyCard(t('vaultEmptyList')) : incidents.map(incidentRow)}
+        {sheets}
+      </div>
+    )
+  }
+
+  if (view === 'deadlines') {
+    return (
+      <div style={scroll}>
+        <VaultBack onBack={() => setView('hub')} />
+        <SectionTitle>{t('appealDeadlines')}</SectionTitle>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
+        <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
+        {deadlines.length === 0 ? emptyCard(t('vaultEmptyDl')) : deadlines.map(deadlineRow)}
+        {sheets}
+      </div>
+    )
+  }
+
+  if (view === 'documents') {
+    return (
+      <div style={scroll}>
+        <VaultBack onBack={() => setView('hub')} />
+        <DocsSection cloud={cloud} docs={vaultDocs.docs} busy={vaultDocs.busy} onAdd={vaultDocs.add} onRemove={vaultDocs.remove} />
+      </div>
+    )
+  }
+
+  if (view === 'packet') {
+    return (
+      <div style={scroll}>
+        <VaultBack onBack={() => setView('hub')} />
+        <SectionTitle>{t('packet')}</SectionTitle>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('packetSub')}</div>
+        {incidents.length === 0 ? emptyCard(t('packetNeedIncident')) : (
+          <>
+            <button onClick={makePacket} style={cloudBtn('primary')}>{t('createPacket')}</button>
+            <CloudNote error={packetError} />
+          </>
+        )}
+      </div>
+    )
+  }
+
+  // contacts
+  return (
+    <div style={scroll}>
+      <VaultBack onBack={() => setView('hub')} />
+      <SectionTitle>{t('helpContacts')}</SectionTitle>
+      <ContactsCard isCA={isCA} />
     </div>
   )
 }
