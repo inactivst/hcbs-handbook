@@ -621,7 +621,11 @@ function Modal({ onClose, children, title, width = 480 }) {
         ...(vvRect
           ? { top: vvRect.top, left: vvRect.left, width: vvRect.width, height: vvRect.height }
           : { inset: 0 }),
-        background: 'rgba(43,42,40,0.45)',
+        // A dark semi-transparent fixed scrim ghosts on iOS - WebKit keeps the
+        // painted pixels after it unmounts (the GuestBook "dim saga"; desktop
+        // Chrome can't reproduce it). On touch use a fully transparent tap-catcher
+        // (the sheet reads as floating via its shadow); keep the dim on desktop.
+        background: IS_TOUCH ? 'transparent' : 'rgba(43,42,40,0.45)',
         // Touch: thumb-reachable bottom sheet. Desktop: centered floating dialog.
         display: 'flex', alignItems: IS_TOUCH ? 'flex-end' : 'center',
         padding: IS_TOUCH ? 0 : 24,
@@ -639,7 +643,8 @@ function Modal({ onClose, children, title, width = 480 }) {
           // The overlay is already the visible area (above the keyboard), so a
           // simple share of it keeps the sheet on-screen without kbInset math.
           maxHeight: IS_TOUCH ? '94%' : '90vh',
-          boxShadow: '0 -8px 40px rgba(43,42,40,0.18)',
+          // Stronger on touch so the sheet still reads as floating without a scrim.
+          boxShadow: IS_TOUCH ? '0 -14px 48px rgba(43,42,40,0.30)' : '0 -8px 40px rgba(43,42,40,0.18)',
         }}
       >
         {IS_TOUCH && <div style={{ width: 40, height: 4, borderRadius: 2, background: C.lineHard, margin: '0 auto 14px', flexShrink: 0 }} />}
@@ -666,6 +671,7 @@ function Modal({ onClose, children, title, width = 480 }) {
 // actions. Vertical scroll wins (axis check); tap closes an open row first.
 function SwipeableRow({ onTap, actions = [], radius = 14, marginBottom = 8, children }) {
   const [swiped, setSwiped] = useState(false)
+  const swipedRef = useRef(false)
   const cardRef = useRef(null)
   const actionsRef = useRef(null)
   const tx = useRef(null)
@@ -675,6 +681,7 @@ function SwipeableRow({ onTap, actions = [], radius = 14, marginBottom = 8, chil
   const actionW = 78
   const revealW = actions.length * actionW
   const snap = 'transform 0.28s cubic-bezier(0.34,1.56,0.64,1)'
+  useEffect(() => { swipedRef.current = swiped }, [swiped])
 
   const setX = (x, withSnap) => {
     if (!cardRef.current) return
@@ -686,35 +693,51 @@ function SwipeableRow({ onTap, actions = [], radius = 14, marginBottom = 8, chil
   }
   const close = () => { setSwiped(false); setX(0, true) }
 
-  const onTouchStart = (e) => {
-    tx.current = e.touches[0].clientX
-    ty.current = e.touches[0].clientY
-    dragging.current = false
-    moved.current = false
-  }
-  const onTouchMove = (e) => {
-    if (tx.current === null || !revealW) return
-    const dx = e.touches[0].clientX - tx.current
-    const dy = e.touches[0].clientY - ty.current
-    if (!dragging.current) {
-      if (Math.abs(dx) < 8) return
-      if (Math.abs(dy) > Math.abs(dx)) { tx.current = null; return } // vertical scroll wins
-      dragging.current = true
-      moved.current = true
+  // NATIVE touch listeners (not React onTouch*): inside a Modal, the sheet's own
+  // native touchmove calls stopPropagation, which would swallow React's delegated
+  // handler at the root before it ever fires. A listener on the card itself runs
+  // first in the bubble, so the swipe keeps working anywhere.
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el || !revealW) return
+    const onStart = (e) => {
+      tx.current = e.touches[0].clientX
+      ty.current = e.touches[0].clientY
+      dragging.current = false
+      moved.current = false
     }
-    const base = swiped ? -revealW : 0
-    const clamped = Math.max(-revealW - 8, Math.min(0, base + dx))
-    setX(clamped, false)
-  }
-  const onTouchEnd = (e) => {
-    if (!dragging.current) return
-    dragging.current = false
-    const dx = e.changedTouches[0].clientX - (tx.current ?? e.changedTouches[0].clientX)
-    const base = swiped ? -revealW : 0
-    if (base + dx < -revealW / 2) { setSwiped(true); setX(-revealW, true) }
-    else { setSwiped(false); setX(0, true) }
-    tx.current = null
-  }
+    const onMove = (e) => {
+      if (tx.current === null) return
+      const dx = e.touches[0].clientX - tx.current
+      const dy = e.touches[0].clientY - ty.current
+      if (!dragging.current) {
+        if (Math.abs(dx) < 8) return
+        if (Math.abs(dy) > Math.abs(dx)) { tx.current = null; return } // vertical scroll wins
+        dragging.current = true
+        moved.current = true
+      }
+      const base = swipedRef.current ? -revealW : 0
+      setX(Math.max(-revealW - 8, Math.min(0, base + dx)), false)
+    }
+    const onEnd = (e) => {
+      if (!dragging.current) return
+      dragging.current = false
+      const dx = e.changedTouches[0].clientX - (tx.current ?? e.changedTouches[0].clientX)
+      const base = swipedRef.current ? -revealW : 0
+      if (base + dx < -revealW / 2) { setSwiped(true); setX(-revealW, true) }
+      else { setSwiped(false); setX(0, true) }
+      tx.current = null
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: true })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealW])
 
   const handleClick = (e) => {
     if (swiped) { e.stopPropagation(); close(); return }
@@ -745,9 +768,6 @@ function SwipeableRow({ onTap, actions = [], radius = 14, marginBottom = 8, chil
       )}
       <div
         ref={cardRef}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
         onClick={handleClick}
         style={{ position: 'relative', zIndex: 1, touchAction: 'pan-y' }}
       >
@@ -1156,12 +1176,11 @@ function Header({ onSettings, onCloud, onHistory, connected }) {
   const t = useT()
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0', flexShrink: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: 0.2 }}>HandBook</div>
-          <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>{t('tagline')}</div>
-        </div>
-        <div style={{ display: 'flex', gap: 8, flexShrink: 0, paddingTop: 2 }}>
+      {/* Wordmark + actions share the top row; the tagline sits full-width below
+          so it never wraps awkwardly against the icon cluster. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ fontFamily: serif, fontSize: 27, fontWeight: 700, letterSpacing: -0.3, lineHeight: 1, color: C.ink }}>HandBook</div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={19} /></IconBtn>
           <IconBtn label={connected ? t('accountSynced') : t('cloudSync')} onClick={onCloud}>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
@@ -1174,7 +1193,8 @@ function Header({ onSettings, onCloud, onHistory, connected }) {
           <IconBtn label={t('settings')} onClick={onSettings}><IcSettings size={19} /></IconBtn>
         </div>
       </div>
-      <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '8px 12px', margin: '12px 0 0', lineHeight: 1.45 }}>
+      <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>{t('tagline')}</div>
+      <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '9px 12px', margin: '13px 0 0', lineHeight: 1.5 }}>
         {t('disclaimer')}
       </div>
     </div>
