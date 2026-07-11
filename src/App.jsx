@@ -1700,11 +1700,11 @@ function CloudSheet({ onClose, cloud }) {
       {status === 'code_sent' && (
         <div>
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 16 }}>
-            We sent a 6-digit code to <strong>{email}</strong>. Enter it below.
+            We emailed a code to <strong>{email}</strong>. Enter it below.
           </div>
           <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>Code</label>
           <input
-            type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={6}
+            type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="12345678" maxLength={10}
             value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             onKeyDown={(e) => { if (e.key === 'Enter') cloud.verifyCode(code) }}
             style={{ ...inputStyle, fontSize: 16, letterSpacing: 4, textAlign: 'center' }}

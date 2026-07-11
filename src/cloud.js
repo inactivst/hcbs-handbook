@@ -95,7 +95,7 @@ export function useCloud() {
 
   const verifyCode = useCallback(async (code) => {
     const token = (code || '').trim()
-    if (!token) { setError('Enter the 6-digit code.'); return }
+    if (!token) { setError('Enter the code from the email.'); return }
     setBusy(true); setError('')
     try {
       const { data, error: e } = await supabase.auth.verifyOtp({
