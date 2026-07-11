@@ -172,6 +172,18 @@ const IcPhone = ({ size = 24, style }) => (
     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" />
   </SvgIcon>
 )
+const IcShield = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </SvgIcon>
+)
+// Saved-questions list icon for the History button.
+const IcHistory = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+    <circle cx="3.5" cy="6" r="0.9" /><circle cx="3.5" cy="12" r="0.9" /><circle cx="3.5" cy="18" r="0.9" />
+  </SvgIcon>
+)
 
 // Compact human byte size (e.g. "2.4 MB") for the document rows.
 const formatBytes = (n) => {
@@ -883,6 +895,8 @@ export default function App() {
   const [error, setError] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const [showCloud, setShowCloud] = useState(false)
+  const [showVault, setShowVault] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
   // '' = never chosen -> first-launch prompt asks. Chosen state grounds every
   // answer (sent with each question) and drives the Rights page split.
   const [stateCode, setStateCode] = useState(() => {
@@ -1067,27 +1081,40 @@ export default function App() {
     <LangContext.Provider value={lang}>
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        <Header onSettings={() => setShowSettings(true)} onCloud={() => setShowCloud(true)} connected={cloud.status === 'ready'} />
+        <Header
+          onSettings={() => setShowSettings(true)}
+          onCloud={() => setShowCloud(true)}
+          onHistory={() => setShowHistory(true)}
+          connected={cloud.status === 'ready'}
+        />
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
-        {tab === 'history' && <History conversations={conversations} onOpen={openConversation} onDelete={deleteConversation} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
-        {tab === 'vault' && (
-          <VaultPage
-            cloud={cloud}
-            incidents={incidents.items}
-            onSaveIncident={incidents.save}
-            onDeleteIncident={incidents.remove}
-            deadlines={deadlines.items}
-            onSaveDeadline={deadlines.save}
-            onDeleteDeadline={deadlines.remove}
-            vaultDocs={vaultDocs}
-            onOpenAccount={() => setShowCloud(true)}
-            isCA={(stateCode || 'CA') === 'CA'}
-          />
-        )}
       </div>
-      <Nav tab={tab} setTab={setTab} onAsk={startNew} />
+      <Nav tab={tab} onAsk={startNew} onLibrary={() => setTab('library')} onVault={() => setShowVault(true)} />
       {!stateCode && <StatePrompt onChoose={chooseState} />}
+      {showVault && (
+        <VaultSheet
+          onClose={() => setShowVault(false)}
+          cloud={cloud}
+          incidents={incidents.items}
+          onSaveIncident={incidents.save}
+          onDeleteIncident={incidents.remove}
+          deadlines={deadlines.items}
+          onSaveDeadline={deadlines.save}
+          onDeleteDeadline={deadlines.remove}
+          vaultDocs={vaultDocs}
+          onOpenAccount={() => { setShowVault(false); setShowCloud(true) }}
+          isCA={(stateCode || 'CA') === 'CA'}
+        />
+      )}
+      {showHistory && (
+        <HistorySheet
+          onClose={() => setShowHistory(false)}
+          conversations={conversations}
+          onOpen={(id) => { setShowHistory(false); openConversation(id) }}
+          onDelete={deleteConversation}
+        />
+      )}
       {showSettings && (
         <SettingsSheet
           onClose={() => setShowSettings(false)}
@@ -1122,7 +1149,7 @@ function IconBtn({ label, onClick, children }) {
   )
 }
 
-function Header({ onSettings, onCloud, connected }) {
+function Header({ onSettings, onCloud, onHistory, connected }) {
   const t = useT()
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0', flexShrink: 0 }}>
@@ -1132,6 +1159,7 @@ function Header({ onSettings, onCloud, connected }) {
           <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>{t('tagline')}</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, paddingTop: 2 }}>
+          <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={19} /></IconBtn>
           <IconBtn label={connected ? t('accountSynced') : t('cloudSync')} onClick={onCloud}>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
               <IcCloud size={19} style={connected ? { color: C.accent } : undefined} />
@@ -1150,20 +1178,22 @@ function Header({ onSettings, onCloud, connected }) {
   )
 }
 
-function Nav({ tab, setTab, onAsk }) {
+// Bottom nav: Ask (left) · raised Vault button (center, opens the vault sheet) ·
+// Rights (right). History lives on the Ask page header, not here.
+function Nav({ tab, onAsk, onLibrary, onVault }) {
   const t = useT()
-  const items = [
-    { key: 'chat', label: t('navAsk'), onClick: onAsk },
-    { key: 'history', label: t('navHistory'), onClick: () => setTab('history') },
-    { key: 'library', label: t('navRights'), onClick: () => setTab('library') },
-    { key: 'vault', label: t('navVault'), onClick: () => setTab('vault') },
-  ]
+  const pill = (label, active, onClick) => (
+    <button onClick={onClick} style={{
+      border: 'none', background: active ? C.accent : 'transparent', color: active ? '#fff' : C.sub,
+      borderRadius: 999, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+    }}>{label}</button>
+  )
   return (
     <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'max(env(safe-area-inset-bottom), 12px)', display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
       <div
         style={{
           pointerEvents: 'auto',
-          display: 'flex', gap: 4, padding: 5,
+          display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px',
           background: 'rgba(255,255,255,0.72)',
           backdropFilter: 'blur(14px) saturate(1.3)',
           WebkitBackdropFilter: 'blur(14px) saturate(1.3)',
@@ -1172,24 +1202,18 @@ function Nav({ tab, setTab, onAsk }) {
           boxShadow: '0 8px 28px rgba(43,42,40,0.16)',
         }}
       >
-        {items.map((it) => {
-          const active = tab === it.key
-          return (
-            <button
-              key={it.key}
-              onClick={it.onClick}
-              style={{
-                border: 'none',
-                background: active ? C.accent : 'transparent',
-                color: active ? '#fff' : C.sub,
-                borderRadius: 999, padding: '9px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {it.label}
-            </button>
-          )
-        })}
+        {pill(t('navAsk'), tab === 'chat', onAsk)}
+        {/* Raised center Vault button (GuestBook Tools pattern) */}
+        <button onClick={onVault} aria-label={t('navVault')} style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
+          width: 60, height: 60, marginTop: -22, borderRadius: '50%', flexShrink: 0,
+          background: C.accent, color: '#fff', border: '3px solid rgba(255,255,255,0.9)', cursor: 'pointer',
+          boxShadow: '0 6px 18px rgba(46,125,116,0.4)',
+        }}>
+          <IcShield size={22} />
+          <span style={{ fontSize: 10, fontWeight: 700 }}>{t('navVault')}</span>
+        </button>
+        {pill(t('navRights'), tab === 'library', onLibrary)}
       </div>
     </div>
   )
@@ -1457,11 +1481,16 @@ const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref
   )
 })
 
-function History({ conversations, onOpen, onDelete }) {
+// History is now shown inside HistorySheet (a Modal opened from the Ask header),
+// so `embedded` drops the standalone scroll wrapper + heading (the Modal owns
+// both) and just renders the list.
+function History({ conversations, onOpen, onDelete, embedded }) {
   const t = useT()
+  const Wrap = embedded ? React.Fragment : 'div'
+  const wrapProps = embedded ? {} : { style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' } }
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
-      <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>{t('savedQuestions')}</div>
+    <Wrap {...wrapProps}>
+      {!embedded && <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>{t('savedQuestions')}</div>}
       {conversations.length === 0 ? (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
           {t('historyEmpty')}
@@ -1502,7 +1531,17 @@ function History({ conversations, onOpen, onDelete }) {
           {IS_TOUCH ? t('swipeHint') : ''}{t('historyFooter', { n: MAX_CONVERSATIONS })}
         </div>
       )}
-    </div>
+    </Wrap>
+  )
+}
+
+// History as a bottom sheet, opened from the Ask page header.
+function HistorySheet({ onClose, conversations, onOpen, onDelete }) {
+  const t = useT()
+  return (
+    <Modal onClose={onClose} title={t('savedQuestions')}>
+      <History conversations={conversations} onOpen={onOpen} onDelete={onDelete} embedded />
+    </Modal>
   )
 }
 
@@ -1918,7 +1957,7 @@ function DocThumb({ doc, cloud }) {
   return <div ref={ref} style={box}><IcDoc size={20} /></div>
 }
 
-function DocsSection({ cloud, docs, busy, onAdd, onRemove }) {
+function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded }) {
   const t = useT()
   const [error, setError] = useState('')
   const inputRef = useRef(null)
@@ -1943,7 +1982,7 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove }) {
 
   return (
     <>
-      <SectionTitle>{t('docsTitle')}</SectionTitle>
+      {!embedded && <SectionTitle>{t('docsTitle')}</SectionTitle>}
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('docsSub')}</div>
       <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple onChange={onPick} style={{ display: 'none' }} />
       <button disabled={busy} onClick={() => inputRef.current?.click()} style={{ ...cloudBtn('primary'), marginBottom: 8, opacity: busy ? 0.6 : 1 }}>
@@ -2139,29 +2178,24 @@ function VaultTile({ icon, label, sub, onClick }) {
 
 // Labeled back control for a vault drill-in (clear text, not a bare chevron -
 // intuitive for every user).
-function VaultBack({ onBack }) {
+// The Vault is a bottom sheet opened from the raised center nav button. It shows
+// a grid of tiles; tapping one swaps to that tool's own sheet. Only one sheet is
+// mounted at a time - swiping it down (or Close) drops back one level (tool →
+// tiles → closed), so navigation is all "pull down", no back buttons.
+function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
   const t = useT()
-  return (
-    <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'none', border: 'none', color: C.accent, fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: '2px 2px 2px 0', marginBottom: 6, fontFamily: 'inherit' }}>
-      <IcChevron dir="left" size={18} /> {t('navVault')}
-    </button>
-  )
-}
-
-function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
-  const t = useT()
-  const [view, setView] = useState('hub') // hub | incidents | deadlines | documents | packet | contacts
+  const [tool, setTool] = useState(null) // null(tiles) | incidents | deadlines | documents | packet | contacts
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const [packetError, setPacketError] = useState('')
   const ready = cloud.status === 'ready'
+  const backToTiles = () => setTool(null)
 
   const makePacket = () => {
     setPacketError('')
     if (!openPacket(incidents, t, isCA)) setPacketError(t('packetOpenFailed'))
   }
 
-  const scroll = { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }
   const emptyCard = (text) => (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>{text}</div>
   )
@@ -2231,23 +2265,7 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
     )
   }
 
-  // Signed out: sign-in prompt + the public help lines (crisis help never needs
-  // an account).
-  if (!ready) {
-    return (
-      <div style={scroll}>
-        <SectionTitle first>{t('navVault')}</SectionTitle>
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '18px 16px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)', marginBottom: 22 }}>
-          <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
-          <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
-        </div>
-        <SectionTitle>{t('helpContacts')}</SectionTitle>
-        <ContactsCard isCA={isCA} />
-      </div>
-    )
-  }
-
-  const sheets = (
+  const editSheets = (
     <>
       {editing && (
         <IncidentSheet initial={editing === 'new' ? null : editing} onSave={onSaveIncident} onClose={() => setEditing(null)} />
@@ -2258,64 +2276,72 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
     </>
   )
 
-  // ── Hub: a grid of tiles, one per tool. Visual, minimal words. ──────────────
-  if (view === 'hub') {
+  // Tiles / sign-in sheet (tool === null).
+  if (tool === null) {
     return (
-      <div style={scroll}>
-        <SectionTitle first>{t('navVault')}</SectionTitle>
-        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, marginBottom: 14 }}>{t('vaultHubSub')}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setView('incidents')} />
-          <VaultTile icon={<IcClock size={22} />} label={t('appealDeadlines')} sub={countText(deadlines.length)} onClick={() => setView('deadlines')} />
-          <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setView('documents')} />
-          <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setView('packet')} />
-          <VaultTile icon={<IcPhone size={22} />} label={t('helpContacts')} sub={t('tileContactsSub')} onClick={() => setView('contacts')} />
-        </div>
-        <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
-      </div>
+      <Modal onClose={onClose} title={t('navVault')}>
+        {!ready ? (
+          <>
+            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 14, padding: '16px 14px', marginBottom: 18 }}>
+              <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
+              <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>{t('helpContacts')}</div>
+            <ContactsCard isCA={isCA} />
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, marginBottom: 14 }}>{t('vaultHubSub')}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setTool('incidents')} />
+              <VaultTile icon={<IcClock size={22} />} label={t('appealDeadlines')} sub={countText(deadlines.length)} onClick={() => setTool('deadlines')} />
+              <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setTool('documents')} />
+              <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setTool('packet')} />
+              <VaultTile icon={<IcPhone size={22} />} label={t('helpContacts')} sub={t('tileContactsSub')} onClick={() => setTool('contacts')} />
+            </div>
+            <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
+          </>
+        )}
+      </Modal>
     )
   }
 
-  // ── Drill-in views ─────────────────────────────────────────────────────────
-  if (view === 'incidents') {
+  if (tool === 'incidents') {
     return (
-      <div style={scroll}>
-        <VaultBack onBack={() => setView('hub')} />
-        <SectionTitle>{t('incidentLog')}</SectionTitle>
-        <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
-        {incidents.length === 0 ? emptyCard(t('vaultEmptyList')) : incidents.map(incidentRow)}
-        {sheets}
-      </div>
+      <>
+        <Modal onClose={backToTiles} title={t('incidentLog')}>
+          <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
+          {incidents.length === 0 ? emptyCard(t('vaultEmptyList')) : incidents.map(incidentRow)}
+        </Modal>
+        {editSheets}
+      </>
     )
   }
 
-  if (view === 'deadlines') {
+  if (tool === 'deadlines') {
     return (
-      <div style={scroll}>
-        <VaultBack onBack={() => setView('hub')} />
-        <SectionTitle>{t('appealDeadlines')}</SectionTitle>
-        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
-        <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
-        {deadlines.length === 0 ? emptyCard(t('vaultEmptyDl')) : deadlines.map(deadlineRow)}
-        {sheets}
-      </div>
+      <>
+        <Modal onClose={backToTiles} title={t('appealDeadlines')}>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
+          <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
+          {deadlines.length === 0 ? emptyCard(t('vaultEmptyDl')) : deadlines.map(deadlineRow)}
+        </Modal>
+        {editSheets}
+      </>
     )
   }
 
-  if (view === 'documents') {
+  if (tool === 'documents') {
     return (
-      <div style={scroll}>
-        <VaultBack onBack={() => setView('hub')} />
-        <DocsSection cloud={cloud} docs={vaultDocs.docs} busy={vaultDocs.busy} onAdd={vaultDocs.add} onRemove={vaultDocs.remove} />
-      </div>
+      <Modal onClose={backToTiles} title={t('docsTitle')}>
+        <DocsSection cloud={cloud} docs={vaultDocs.docs} busy={vaultDocs.busy} onAdd={vaultDocs.add} onRemove={vaultDocs.remove} embedded />
+      </Modal>
     )
   }
 
-  if (view === 'packet') {
+  if (tool === 'packet') {
     return (
-      <div style={scroll}>
-        <VaultBack onBack={() => setView('hub')} />
-        <SectionTitle>{t('packet')}</SectionTitle>
+      <Modal onClose={backToTiles} title={t('packet')}>
         <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('packetSub')}</div>
         {incidents.length === 0 ? emptyCard(t('packetNeedIncident')) : (
           <>
@@ -2323,17 +2349,15 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
             <CloudNote error={packetError} />
           </>
         )}
-      </div>
+      </Modal>
     )
   }
 
   // contacts
   return (
-    <div style={scroll}>
-      <VaultBack onBack={() => setView('hub')} />
-      <SectionTitle>{t('helpContacts')}</SectionTitle>
+    <Modal onClose={backToTiles} title={t('helpContacts')}>
       <ContactsCard isCA={isCA} />
-    </div>
+    </Modal>
   )
 }
 
