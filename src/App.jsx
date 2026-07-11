@@ -432,6 +432,22 @@ function Modal({ onClose, children, title, width = 480 }) {
 
   const kbInset = useKeyboardInset()
 
+  // iOS (worst in the home-screen PWA) pans the VISUAL viewport down when a
+  // focused field would sit behind the keyboard. Fixed overlays live in the
+  // LAYOUT viewport, so that pan shoves the whole sheet up off-screen - on top
+  // of the sheet's own kbInset lift. Pin the overlay to the visual viewport by
+  // shifting it down by exactly the pan amount.
+  const [vvTop, setVvTop] = useState(0)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const on = () => setVvTop(vv.offsetTop || 0)
+    vv.addEventListener('resize', on)
+    vv.addEventListener('scroll', on)
+    on()
+    return () => { vv.removeEventListener('resize', on); vv.removeEventListener('scroll', on) }
+  }, [])
+
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -543,6 +559,7 @@ function Modal({ onClose, children, title, width = 480 }) {
       onTouchEnd={(e) => e.stopPropagation()}
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
+        transform: vvTop ? `translateY(${vvTop}px)` : 'none',
         background: 'rgba(43,42,40,0.45)',
         // Touch: thumb-reachable bottom sheet. Desktop: centered floating dialog.
         display: 'flex', alignItems: IS_TOUCH ? 'flex-end' : 'center',
