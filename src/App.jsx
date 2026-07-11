@@ -886,40 +886,11 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations, cloud.status])
 
-  // ─── Vault: incident log (cloud-only, E2E) ──────────────────────────────────
+  // ─── Vault collections (cloud-only, E2E) ────────────────────────────────────
   // Loaded fresh from the account on every unlock; cleared from memory the
   // moment the vault locks. Never persisted plaintext on the device.
-  const [incidents, setIncidents] = useState([])
-  const incidentsLoadedRef = useRef(false)
-  useEffect(() => {
-    if (cloud.status !== 'ready') { incidentsLoadedRef.current = false; setIncidents([]); return }
-    let alive = true
-    ;(async () => {
-      const list = await cloud.pullItems('incident')
-      if (!alive) return
-      setIncidents(incidentSort(list))
-      incidentsLoadedRef.current = true
-    })()
-    return () => { alive = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloud.status])
-  useEffect(() => {
-    if (cloud.status !== 'ready' || !incidentsLoadedRef.current) return
-    const t = setTimeout(() => cloud.pushItems('incident', incidents), 800)
-    return () => clearTimeout(t)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [incidents, cloud.status])
-
-  function saveIncident(rec) {
-    setIncidents((prev) => incidentSort(
-      rec.id ? prev.map((i) => (i.id === rec.id ? { ...i, ...rec } : i))
-             : [{ ...rec, id: genId(), createdAt: Date.now() }, ...prev]
-    ))
-  }
-  function deleteIncident(id) {
-    setIncidents((prev) => prev.filter((i) => i.id !== id))
-    cloud.deleteItem(id)
-  }
+  const incidents = useVaultCollection(cloud, 'incident', incidentSort)
+  const deadlines = useVaultCollection(cloud, 'deadline', deadlineSort)
 
   const activeMessages = (activeId ? conversations.find((c) => c.id === activeId)?.messages : null) || []
 
@@ -1048,9 +1019,12 @@ export default function App() {
         {tab === 'vault' && (
           <VaultPage
             cloud={cloud}
-            incidents={incidents}
-            onSaveIncident={saveIncident}
-            onDeleteIncident={deleteIncident}
+            incidents={incidents.items}
+            onSaveIncident={incidents.save}
+            onDeleteIncident={incidents.remove}
+            deadlines={deadlines.items}
+            onSaveDeadline={deadlines.save}
+            onDeleteDeadline={deadlines.remove}
             onOpenAccount={() => setShowCloud(true)}
           />
         )}
@@ -1615,6 +1589,76 @@ const todayISO = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Appeal-deadline math. Tracks mirror the CA dual appeal system the corpus
+// teaches (regional center 60d / Medi-Cal via CDSS 90d); custom covers
+// anything else. All date work in local time, whole days.
+const deadlineDays = (rec) => (rec.track === 'rc' ? 60 : rec.track === 'medical' ? 90 : Math.max(1, Number(rec.days) || 60))
+const addDaysISO = (iso, n) => {
+  const [y, m, d] = (iso || todayISO()).split('-').map(Number)
+  const dt = new Date(y, m - 1, d + n)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+}
+const isoToLocale = (iso) => {
+  const [y, m, d] = (iso || todayISO()).split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString()
+}
+const daysUntil = (iso) => {
+  const [y, m, d] = (iso || todayISO()).split('-').map(Number)
+  const now = new Date()
+  const t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((new Date(y, m - 1, d) - t0) / 86400000)
+}
+const deadlineSort = (list) =>
+  [...list].sort((a, b) => addDaysISO(a.notice, deadlineDays(a)).localeCompare(addDaysISO(b.notice, deadlineDays(b))))
+
+// One state+sync pattern for every vault collection: pull on unlock, clear on
+// lock, debounce-push edits, explicit cloud delete (upserts never remove).
+function useVaultCollection(cloud, kind, sortFn) {
+  const [items, setItems] = useState([])
+  const loadedRef = useRef(false)
+  useEffect(() => {
+    if (cloud.status !== 'ready') { loadedRef.current = false; setItems([]); return }
+    let alive = true
+    ;(async () => {
+      const list = await cloud.pullItems(kind)
+      if (!alive) return
+      setItems(sortFn(list))
+      loadedRef.current = true
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloud.status])
+  useEffect(() => {
+    if (cloud.status !== 'ready' || !loadedRef.current) return
+    const t = setTimeout(() => cloud.pushItems(kind, items), 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, cloud.status])
+  const save = useCallback((rec) => {
+    setItems((prev) => sortFn(
+      rec.id ? prev.map((i) => (i.id === rec.id ? { ...i, ...rec } : i))
+             : [{ ...rec, id: genId(), createdAt: Date.now() }, ...prev]
+    ))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const remove = useCallback((id) => {
+    setItems((prev) => prev.filter((i) => i.id !== id))
+    cloud.deleteItem(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  return { items, save, remove }
+}
+
+// Public help lines (CA focus; NDRN covers everywhere else). Numbers verified
+// against the fact-checked corpus + cdss.ca.gov - treat edits as content edits.
+const CONTACTS = [
+  { name: 'OCRA', descKey: 'cOcra', phone: '1-800-390-7032' },
+  { name: 'CDSS State Hearings', descKey: 'cCdss', phone: '1-800-743-8525' },
+  { name: 'Adult Protective Services', descKey: 'cAps', phone: '1-833-401-0832' },
+  { name: 'Regional centers', descKey: 'cRc', url: 'dds.ca.gov/rc' },
+  { name: 'NDRN', descKey: 'cNdrn', url: 'ndrn.org' },
+]
+
 function IncidentSheet({ initial, onSave, onClose }) {
   const t = useT()
   const [at, setAt] = useState(initial?.at || todayISO())
@@ -1656,10 +1700,128 @@ function IncidentSheet({ initial, onSave, onClose }) {
   )
 }
 
-function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, onOpenAccount }) {
+function DeadlineSheet({ initial, onSave, onClose }) {
+  const t = useT()
+  const [notice, setNotice] = useState(initial?.notice || todayISO())
+  const [track, setTrack] = useState(initial?.track || 'rc')
+  const [label, setLabel] = useState(initial?.label || '')
+  const [days, setDays] = useState(initial?.days ? String(initial.days) : '60')
+  const [error, setError] = useState('')
+  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '12px 0 6px' }
+  const trackOptions = [
+    { value: 'rc', label: t('trackRC') },
+    { value: 'medical', label: t('trackMedical') },
+    { value: 'custom', label: t('trackCustom') },
+  ]
+  return (
+    <Modal onClose={onClose} title={t(initial ? 'editDeadline' : 'addDeadline')}>
+      <label style={{ ...fieldLabel, marginTop: 0 }}>{t('dlTrack')}</label>
+      <Select value={track} onChange={setTrack} options={trackOptions} ariaLabel={t('dlTrack')} />
+      <label style={fieldLabel}>{t('dlNotice')}</label>
+      <input type="date" value={notice} onChange={(e) => setNotice(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />
+      <label style={fieldLabel}>{t('dlLabel')}</label>
+      <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('dlLabelPh')} style={{ ...inputStyle, fontSize: 16 }} />
+      {track === 'custom' && (
+        <>
+          <label style={fieldLabel}>{t('dlDays')}</label>
+          <input
+            type="text" inputMode="numeric" value={days} maxLength={3}
+            onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))}
+            style={{ ...inputStyle, fontSize: 16 }}
+          />
+        </>
+      )}
+      <CloudNote error={error} />
+      <button
+        onClick={() => {
+          if (!notice) { setError(t('dlNeedNotice')); return }
+          onSave({
+            ...(initial || {}),
+            notice, track, label: label.trim(),
+            days: track === 'custom' ? Math.max(1, Number(days) || 60) : undefined,
+          })
+          onClose()
+        }}
+        style={{ ...cloudBtn('primary'), marginTop: 10 }}
+      >
+        {t('save')}
+      </button>
+      <button onClick={onClose} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('cancel')}</button>
+    </Modal>
+  )
+}
+
+function ContactsCard() {
+  const t = useT()
+  return (
+    <>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>{t('contactsSub')}</div>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '6px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        {CONTACTS.map((c, i) => (
+          <div key={c.name} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.name}</div>
+            <div style={{ fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 1.5 }}>{t(c.descKey)}</div>
+            {c.phone ? (
+              <a href={`tel:+1${c.phone.replace(/\D/g, '').replace(/^1/, '')}`} style={{ fontSize: 14, fontWeight: 600, color: C.accent, textDecoration: 'none', marginTop: 3, display: 'inline-block' }}>
+                {c.phone}
+              </a>
+            ) : (
+              <a href={`https://${c.url}`} target="_blank" rel="noreferrer" style={{ fontSize: 14, fontWeight: 600, color: C.accent, textDecoration: 'none', marginTop: 3, display: 'inline-block' }}>
+                {c.url}
+              </a>
+            )}
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 8, lineHeight: 1.5 }}>{t('cEmergency')}</div>
+    </>
+  )
+}
+
+function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, onOpenAccount }) {
   const t = useT()
   const [editing, setEditing] = useState(null) // null | 'new' | incident
+  const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const ready = cloud.status === 'ready'
+
+  const deadlineRow = (rec) => {
+    const due = addDaysISO(rec.notice, deadlineDays(rec))
+    const left = daysUntil(due)
+    const chip = left < 0 ? t('dlPassed') : left === 0 ? t('dlToday') : left === 1 ? t('dlDayLeft') : t('dlDaysLeft', { n: left })
+    const urgent = left <= 14
+    const aidBy = rec.track === 'rc' ? addDaysISO(rec.notice, 30) : null
+    const title = rec.label || (rec.track === 'rc' ? t('trackRC') : rec.track === 'medical' ? t('trackMedical') : t('editDeadline'))
+    return (
+      <SwipeableRow
+        key={rec.id}
+        onTap={() => setEditingDl(rec)}
+        actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDeleteDeadline(rec.id) }]}
+      >
+        <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
+              <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, color: urgent ? '#fff' : C.accent, background: urgent ? C.danger : C.accentSoft, borderRadius: 999, padding: '2px 8px' }}>{chip}</span>
+            </div>
+            <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>{t('dlDeadline', { date: isoToLocale(due) })}</div>
+            {aidBy && daysUntil(aidBy) >= 0 && (
+              <div style={{ fontSize: 12, color: C.sub, marginTop: 2, lineHeight: 1.45 }}>{t('dlAidPending', { date: isoToLocale(aidBy) })}</div>
+            )}
+          </div>
+          {!IS_TOUCH && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDeleteDeadline(rec.id) }}
+              aria-label={t('delete')}
+              style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, background: 'transparent', border: 'none', borderLeft: `1px solid ${C.line}`, color: C.sub, cursor: 'pointer' }}
+            >
+              <IcTrash size={16} />
+            </button>
+          )}
+        </div>
+      </SwipeableRow>
+    )
+  }
+
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
       <SectionTitle first>{t('incidentLog')}</SectionTitle>
@@ -1703,14 +1865,33 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, onOpenA
               </SwipeableRow>
             ))
           )}
+          <SectionTitle>{t('appealDeadlines')}</SectionTitle>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
+          <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
+          {deadlines.length === 0 ? (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
+              {t('vaultEmptyDl')}
+            </div>
+          ) : (
+            deadlines.map(deadlineRow)
+          )}
           <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
         </>
       )}
+      <SectionTitle>{t('helpContacts')}</SectionTitle>
+      <ContactsCard />
       {editing && (
         <IncidentSheet
           initial={editing === 'new' ? null : editing}
           onSave={onSaveIncident}
           onClose={() => setEditing(null)}
+        />
+      )}
+      {editingDl && (
+        <DeadlineSheet
+          initial={editingDl === 'new' ? null : editingDl}
+          onSave={onSaveDeadline}
+          onClose={() => setEditingDl(null)}
         />
       )}
     </div>
