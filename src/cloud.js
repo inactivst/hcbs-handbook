@@ -17,6 +17,15 @@ const APP_TYPE = 'hcbs-handbook'
 const isUuid = (s) => typeof s === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
 
+// The wrapped vault key is a { iv, data } object, but the profiles.encrypted_vault_key
+// column is TEXT, so it round-trips through the DB as a JSON string. Normalize on
+// read so the new-device recover path (which reads from the DB) unwraps the same
+// object shape the local unlock path uses. Accepts an object or a JSON string.
+const parseWrapped = (v) => {
+  if (v && typeof v === 'object') return v
+  try { return JSON.parse(v) } catch { return null }
+}
+
 // status: 'off' (no cloud configured) | 'signed_out' | 'code_sent' | 'need_pin' | 'ready'
 // pinMode (while 'need_pin'): 'setup' (first account) | 'unlock' (known device) | 'recover' (new device)
 export function useCloud() {
@@ -122,8 +131,10 @@ export function useCloud() {
         const salt = newSalt()
         const wrapped = await wrapVaultKeyWithPin(vaultKey, pin, salt)
         const saltB64 = saltToB64(salt)
+        // Store as an explicit JSON string (the column is TEXT) so it always
+        // reads back in a known shape, never relying on driver coercion.
         const { error: e } = await supabase.from('profiles').upsert({
-          id: user.id, kdf_salt: saltB64, encrypted_vault_key: wrapped, app_type: APP_TYPE,
+          id: user.id, kdf_salt: saltB64, encrypted_vault_key: JSON.stringify(wrapped), app_type: APP_TYPE,
         })
         if (e) throw e
         localPin.set(wrapped); localSalt.set(saltB64)
@@ -141,9 +152,11 @@ export function useCloud() {
         if (e) throw e
         if (!profile?.encrypted_vault_key) { setPinMode('setup'); setError(tr('errPinFinish')); return }
         const salt = saltFromB64(profile.kdf_salt)
-        const vaultKey = await unwrapVaultKeyWithPin(profile.encrypted_vault_key, pin, salt)
-        // Mirror the wrapped key locally so future unlocks are offline + instant.
-        localPin.set(profile.encrypted_vault_key); localSalt.set(profile.kdf_salt)
+        const wrapped = parseWrapped(profile.encrypted_vault_key)
+        const vaultKey = await unwrapVaultKeyWithPin(wrapped, pin, salt)
+        // Mirror the wrapped key locally (as the object, matching setup) so future
+        // unlocks on this device are offline + instant.
+        localPin.set(wrapped); localSalt.set(profile.kdf_salt)
         keyRef.current = vaultKey
         setStatus('ready')
       }
