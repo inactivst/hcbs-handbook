@@ -1136,6 +1136,7 @@ export default function App() {
           conversations={conversations}
           onOpen={(id) => { setShowHistory(false); openConversation(id) }}
           onDelete={deleteConversation}
+          connected={cloud.status === 'ready'}
         />
       )}
       {showSettings && (
@@ -1507,7 +1508,7 @@ const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref
 // History is now shown inside HistorySheet (a Modal opened from the Ask header),
 // so `embedded` drops the standalone scroll wrapper + heading (the Modal owns
 // both) and just renders the list.
-function History({ conversations, onOpen, onDelete, embedded }) {
+function History({ conversations, onOpen, onDelete, embedded, connected }) {
   const t = useT()
   const Wrap = embedded ? React.Fragment : 'div'
   const wrapProps = embedded ? {} : { style: { flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' } }
@@ -1551,7 +1552,7 @@ function History({ conversations, onOpen, onDelete, embedded }) {
       )}
       {conversations.length > 0 && (
         <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>
-          {IS_TOUCH ? t('swipeHint') : ''}{t('historyFooter', { n: MAX_CONVERSATIONS })}
+          {IS_TOUCH ? t('swipeHint') : ''}{t(connected ? 'historyFooterSynced' : 'historyFooter', { n: MAX_CONVERSATIONS })}
         </div>
       )}
     </Wrap>
@@ -1559,11 +1560,11 @@ function History({ conversations, onOpen, onDelete, embedded }) {
 }
 
 // History as a bottom sheet, opened from the Ask page header.
-function HistorySheet({ onClose, conversations, onOpen, onDelete }) {
+function HistorySheet({ onClose, conversations, onOpen, onDelete, connected }) {
   const t = useT()
   return (
     <Modal onClose={onClose} title={t('savedQuestions')}>
-      <History conversations={conversations} onOpen={onOpen} onDelete={onDelete} embedded />
+      <History conversations={conversations} onOpen={onOpen} onDelete={onDelete} connected={connected} embedded />
     </Modal>
   )
 }
