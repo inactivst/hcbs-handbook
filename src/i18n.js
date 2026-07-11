@@ -163,11 +163,13 @@ const STRINGS = {
     // Help & contacts
     helpContacts: 'Help & contacts',
     contactsSub: 'Free help lines. These work with or without an account.',
+    contactsNote: "Your state's own agencies are in the Rights tab. These resources work everywhere:",
     cOcra: 'Free legal advocacy for regional center clients (Disability Rights California)',
+    cDds: 'CA Dept of Developmental Services - HCBS, regional centers, 4731 appeals',
     cCdss: 'CDSS State Hearings - appeal Medi-Cal services like IHSS',
     cAps: 'Adult Protective Services (CA) - report abuse or neglect, 24/7',
     cRc: 'Find your regional center',
-    cNdrn: 'Outside California: find your Protection & Advocacy office',
+    cNdrn: "Find your state's disability rights (Protection & Advocacy) office",
     cEmergency: 'In an emergency, call 911.',
     // Grievance packet
     packet: 'Complaint packet',
@@ -336,11 +338,13 @@ const STRINGS = {
     // Help & contacts
     helpContacts: 'Ayuda y contactos',
     contactsSub: 'Líneas de ayuda gratuitas. Funcionan con o sin cuenta.',
+    contactsNote: 'Las agencias de tu estado están en la pestaña Derechos. Estos recursos funcionan en todas partes:',
     cOcra: 'Defensa legal gratuita para clientes del centro regional (Disability Rights California)',
+    cDds: 'Depto de Servicios del Desarrollo de CA: HCBS, centros regionales, apelaciones 4731',
     cCdss: 'Audiencias estatales de CDSS: apela servicios de Medi-Cal como IHSS',
     cAps: 'Servicios de Protección para Adultos (CA): reporta abuso o negligencia, 24/7',
     cRc: 'Encuentra tu centro regional',
-    cNdrn: 'Fuera de California: encuentra tu oficina de Protección y Defensa',
+    cNdrn: 'Encuentra la oficina de derechos de discapacidad (Protección y Defensa) de tu estado',
     cEmergency: 'En una emergencia, llama al 911.',
     // Grievance packet
     packet: 'Paquete de queja',
@@ -509,11 +513,13 @@ const STRINGS = {
     // Help & contacts
     helpContacts: 'Tulong at mga contact',
     contactsSub: 'Libreng mga linya ng tulong. Gumagana ito mayroon man o walang account.',
+    contactsNote: 'Ang mga ahensya ng iyong estado ay nasa tab na Karapatan. Gumagana ang mga resource na ito kahit saan:',
     cOcra: 'Libreng legal na pagtatanggol para sa mga kliyente ng regional center (Disability Rights California)',
+    cDds: 'CA Dept of Developmental Services: HCBS, regional centers, 4731 na apela',
     cCdss: 'CDSS State Hearings: mag-apela ng serbisyo ng Medi-Cal tulad ng IHSS',
     cAps: 'Adult Protective Services (CA): mag-ulat ng pang-aabuso o kapabayaan, 24/7',
     cRc: 'Hanapin ang iyong regional center',
-    cNdrn: 'Sa labas ng California: hanapin ang iyong opisina ng Protection and Advocacy',
+    cNdrn: 'Hanapin ang opisina ng disability rights (Protection and Advocacy) ng iyong estado',
     cEmergency: 'Sa emergency, tumawag sa 911.',
     // Grievance packet
     packet: 'Packet ng reklamo',

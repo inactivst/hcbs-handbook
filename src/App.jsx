@@ -1652,11 +1652,19 @@ function useVaultCollection(cloud, kind, sortFn) {
 
 // Public help lines (CA focus; NDRN covers everywhere else). Numbers verified
 // against the fact-checked corpus + cdss.ca.gov - treat edits as content edits.
-const CONTACTS = [
+// CA-specific help lines (numbers verified vs the corpus + dds.ca.gov). DDS is
+// the developmental-services agency behind HCBS; the CDSS line is only for the
+// Medi-Cal/IHSS track - both are listed so neither dominates.
+const CA_CONTACTS = [
   { name: 'OCRA', descKey: 'cOcra', phone: '1-800-390-7032' },
+  { name: 'CA Dept of Developmental Services', descKey: 'cDds', phone: '1-833-421-0061' },
   { name: 'CDSS State Hearings', descKey: 'cCdss', phone: '1-800-743-8525' },
   { name: 'Adult Protective Services', descKey: 'cAps', phone: '1-833-401-0832' },
   { name: 'Regional centers', descKey: 'cRc', url: 'dds.ca.gov/rc' },
+]
+// Correct in every state - the honest fallback where we don't have that
+// state's agencies structured (HCBS is state-run; we never invent numbers).
+const UNIVERSAL_CONTACTS = [
   { name: 'NDRN', descKey: 'cNdrn', url: 'ndrn.org' },
 ]
 
@@ -1786,12 +1794,15 @@ function IncidentSheet({ initial, onSave, onClose }) {
   )
 }
 
-function DeadlineSheet({ initial, onSave, onClose }) {
+function DeadlineSheet({ initial, onSave, onClose, isCA }) {
   const t = useT()
   const [notice, setNotice] = useState(initial?.notice || todayISO())
-  const [track, setTrack] = useState(initial?.track || 'rc')
+  // The 60/90-day tracks are California law - only offer them in CA. Everywhere
+  // else the deadline varies by state, so we only take a custom day count from
+  // the person's own notice rather than assert a number we can't verify.
+  const [track, setTrack] = useState(initial?.track || (isCA ? 'rc' : 'custom'))
   const [label, setLabel] = useState(initial?.label || '')
-  const [days, setDays] = useState(initial?.days ? String(initial.days) : '60')
+  const [days, setDays] = useState(initial?.days ? String(initial.days) : (isCA ? '60' : '30'))
   const [error, setError] = useState('')
   const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '12px 0 6px' }
   const trackOptions = [
@@ -1799,15 +1810,20 @@ function DeadlineSheet({ initial, onSave, onClose }) {
     { value: 'medical', label: t('trackMedical') },
     { value: 'custom', label: t('trackCustom') },
   ]
+  const showDays = !isCA || track === 'custom'
   return (
     <Modal onClose={onClose} title={t(initial ? 'editDeadline' : 'addDeadline')}>
-      <label style={{ ...fieldLabel, marginTop: 0 }}>{t('dlTrack')}</label>
-      <Select value={track} onChange={setTrack} options={trackOptions} ariaLabel={t('dlTrack')} />
-      <label style={fieldLabel}>{t('dlNotice')}</label>
+      {isCA && (
+        <>
+          <label style={{ ...fieldLabel, marginTop: 0 }}>{t('dlTrack')}</label>
+          <Select value={track} onChange={setTrack} options={trackOptions} ariaLabel={t('dlTrack')} />
+        </>
+      )}
+      <label style={isCA ? fieldLabel : { ...fieldLabel, marginTop: 0 }}>{t('dlNotice')}</label>
       <input type="date" value={notice} onChange={(e) => setNotice(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />
       <label style={fieldLabel}>{t('dlLabel')}</label>
       <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('dlLabelPh')} style={{ ...inputStyle, fontSize: 16 }} />
-      {track === 'custom' && (
+      {showDays && (
         <>
           <label style={fieldLabel}>{t('dlDays')}</label>
           <input
@@ -1821,10 +1837,11 @@ function DeadlineSheet({ initial, onSave, onClose }) {
       <button
         onClick={() => {
           if (!notice) { setError(t('dlNeedNotice')); return }
+          const effTrack = isCA ? track : 'custom'
           onSave({
             ...(initial || {}),
-            notice, track, label: label.trim(),
-            days: track === 'custom' ? Math.max(1, Number(days) || 60) : undefined,
+            notice, track: effTrack, label: label.trim(),
+            days: effTrack === 'custom' ? Math.max(1, Number(days) || 30) : undefined,
           })
           onClose()
         }}
@@ -1837,13 +1854,19 @@ function DeadlineSheet({ initial, onSave, onClose }) {
   )
 }
 
-function ContactsCard() {
+function ContactsCard({ isCA }) {
   const t = useT()
+  // CA gets its verified agency lines; every other state gets only what is true
+  // everywhere (the NDRN P&A finder) plus a pointer to its own Rights tab, so we
+  // never show a Californian a Texas number or invent one we haven't verified.
+  const list = isCA ? [...CA_CONTACTS, ...UNIVERSAL_CONTACTS] : UNIVERSAL_CONTACTS
   return (
     <>
-      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>{t('contactsSub')}</div>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
+        {isCA ? t('contactsSub') : t('contactsNote')}
+      </div>
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '6px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
-        {CONTACTS.map((c, i) => (
+        {list.map((c, i) => (
           <div key={c.name} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.name}</div>
             <div style={{ fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 1.5 }}>{t(c.descKey)}</div>
@@ -1984,7 +2007,7 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
         </>
       )}
       <SectionTitle>{t('helpContacts')}</SectionTitle>
-      <ContactsCard />
+      <ContactsCard isCA={isCA} />
       {editing && (
         <IncidentSheet
           initial={editing === 'new' ? null : editing}
@@ -1997,6 +2020,7 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
           initial={editingDl === 'new' ? null : editingDl}
           onSave={onSaveDeadline}
           onClose={() => setEditingDl(null)}
+          isCA={isCA}
         />
       )}
     </div>
