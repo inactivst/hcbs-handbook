@@ -17,6 +17,13 @@ const APP_TYPE = 'hcbs-handbook'
 const isUuid = (s) => typeof s === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
 
+// Auto-lock: how long the vault stays unlocked in the background before asking
+// for the PIN again. Seconds; '-1' = never, '0' = immediately on hide.
+// (Matches the Book/GuestBook lock-delay model.) Default: never (no surprise
+// lock-outs for users who may find repeated PIN entry hard).
+const LOCK_DELAY_KEY = 'handbook-lock-delay'
+const HIDE_TS_KEY = 'handbook-hide-ts' // sessionStorage: when the app was last hidden
+
 // The wrapped vault key is a { iv, data } object, but the profiles.encrypted_vault_key
 // column is TEXT, so it round-trips through the DB as a JSON string. Normalize on
 // read so the new-device recover path (which reads from the DB) unwraps the same
@@ -177,6 +184,34 @@ export function useCloud() {
     setStatus(userRef.current ? 'need_pin' : 'signed_out')
   }, [])
 
+  // Auto-lock delay setting (persisted). '-1' never | '0' immediately | seconds.
+  const [lockDelay, setLockDelayState] = useState(() => {
+    try { return localStorage.getItem(LOCK_DELAY_KEY) ?? '-1' } catch { return '-1' }
+  })
+  const setLockDelay = useCallback((v) => {
+    setLockDelayState(v)
+    try { localStorage.setItem(LOCK_DELAY_KEY, v) } catch { /* just won't persist */ }
+  }, [])
+
+  // Enforce the delay on app hide/show. Only relevant while unlocked (a key is
+  // in memory). Immediately-on-hide for '0'; on return past the grace period for
+  // a positive delay; never for '-1'.
+  useEffect(() => {
+    const onVis = () => {
+      if (!keyRef.current) return
+      const delay = Number(localStorage.getItem(LOCK_DELAY_KEY) ?? '-1')
+      if (document.hidden) {
+        try { sessionStorage.setItem(HIDE_TS_KEY, String(Date.now())) } catch { /* ignore */ }
+        if (delay === 0) lock()
+      } else if (delay > 0) {
+        const hid = Number(sessionStorage.getItem(HIDE_TS_KEY) || 0)
+        if (hid && Date.now() - hid > delay * 1000) lock()
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [lock])
+
   // Full sign-out: end the session and clear ALL local account material so a
   // different account can sign in cleanly on this device (no stale PIN wrap).
   const signOut = useCallback(async () => {
@@ -277,6 +312,7 @@ export function useCloud() {
     status, pinMode, email, error, busy,
     setEmail, setError,
     sendCode, verifyCode, submitPin, lock, signOut, restart,
+    lockDelay, setLockDelay,
     pushConversations, pullConversations,
     pushItems, pullItems, deleteItem,
     uploadBytes, downloadBytes, removeBytes,

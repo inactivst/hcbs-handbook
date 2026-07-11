@@ -2329,6 +2329,17 @@ function StatePrompt({ onChoose }) {
   )
 }
 
+// Auto-lock delay choices (seconds; -1 never, 0 immediately). Values match the
+// cloud.js lock-delay model.
+const LOCK_OPTIONS = [
+  { value: '0', labelKey: 'lockImmediately' },
+  { value: '60', labelKey: 'lock1m' },
+  { value: '300', labelKey: 'lock5m' },
+  { value: '900', labelKey: 'lock15m' },
+  { value: '3600', labelKey: 'lock1h' },
+  { value: '-1', labelKey: 'lockNever' },
+]
+
 // Primary/secondary buttons for the account flow (match the app's field tokens).
 const cloudBtn = (kind = 'primary') => ({
   width: '100%', boxSizing: 'border-box', border: 'none', cursor: 'pointer',
@@ -2468,6 +2479,23 @@ function CloudSheet({ onClose, cloud }) {
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>
             {t('readySub')}
           </div>
+
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.ink, marginBottom: 2 }}>{t('autoLock')}</div>
+          <div style={{ fontSize: 12, color: C.sub, lineHeight: 1.5, marginBottom: 8 }}>{t('autoLockSub')}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 16 }}>
+            {LOCK_OPTIONS.map((o) => {
+              const active = cloud.lockDelay === o.value
+              return (
+                <button key={o.value} onClick={() => cloud.setLockDelay(o.value)} style={{
+                  padding: '10px 6px', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                  border: `1.5px solid ${active ? C.accent : C.border}`,
+                  background: active ? C.accentSoft : C.surface,
+                  color: active ? C.accent : C.sub,
+                }}>{t(o.labelKey)}</button>
+              )
+            })}
+          </div>
+
           <button onClick={() => { cloud.lock(); onClose() }} style={cloudBtn('secondary')}>{t('lock')}</button>
           <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 8, color: C.danger }}>{t('signOut')}</button>
         </div>
