@@ -1624,32 +1624,52 @@ function HistorySheet({ onClose, conversations, onOpen, onDelete, connected }) {
   )
 }
 
-// Disclosure card list shared by every Rights section (federal, your state,
-// inside another state's row). One open at a time per list.
-function ChunkList({ chunks }) {
-  const [open, setOpen] = useState(null)
-  return chunks.map((c) => {
-    const isOpen = open === c.id
-    return (
-      <div key={c.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
-        <button
-          onClick={() => setOpen(isOpen ? null : c.id)}
-          style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'transparent', border: 'none', padding: '13px 14px', cursor: 'pointer', textAlign: 'left' }}
-        >
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.title}</div>
-            <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{c.citation}</div>
-          </div>
-          {/* Disclosure convention: right → down (never a plain text glyph). */}
-          <IcChevron dir={isOpen ? 'down' : 'right'} size={16} style={{ color: C.accent, flexShrink: 0 }} />
-        </button>
-        {isOpen && (
-          <div style={{ padding: '0 14px 14px', fontSize: 14, lineHeight: 1.6, color: C.ink, whiteSpace: 'pre-wrap' }}>{c.text}</div>
-        )}
-      </div>
-    )
-  })
-}
+// ─── Rights hub icons (topic tiles + group headers) ───────────────────────────
+const IcStar = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <polygon points="12 2 15 8.5 22 9.3 17 14 18.3 21 12 17.5 5.7 21 7 14 2 9.3 9 8.5 12 2" />
+  </SvgIcon>
+)
+const IcColumns = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M3 21h18" /><path d="M12 2 3 8h18z" /><path d="M5 8v10M10 8v10M14 8v10M19 8v10" />
+  </SvgIcon>
+)
+const IcHash = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <line x1="4" y1="9" x2="20" y2="9" /><line x1="4" y1="15" x2="20" y2="15" />
+    <line x1="10" y1="3" x2="8" y2="21" /><line x1="16" y1="3" x2="14" y2="21" />
+  </SvgIcon>
+)
+const IcMap = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <polygon points="1 6 8 3 16 6 23 3 23 18 16 21 8 18 1 21 1 6" />
+    <line x1="8" y1="3" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="21" />
+  </SvgIcon>
+)
+const IcScale = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M12 3v18" /><path d="M7 21h10" /><path d="M4 7h16" />
+    <path d="M12 4 5 7l3 6a3 3 0 0 1-6 0z" /><path d="M12 4l7 3-3 6a3 3 0 0 0 6 0z" />
+  </SvgIcon>
+)
+const IcInfo = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <circle cx="12" cy="12" r="9" /><line x1="12" y1="11" x2="12" y2="16" />
+    <circle cx="12" cy="7.6" r="0.7" fill="currentColor" stroke="none" />
+  </SvgIcon>
+)
+const IcUsers = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </SvgIcon>
+)
+const IcHeart = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 1 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z" />
+  </SvgIcon>
+)
 
 function ServiceCodeList({ codes }) {
   return (
@@ -1670,40 +1690,216 @@ function SectionTitle({ children, first = false }) {
   return <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: `${first ? 4 : 22}px 0 10px` }}>{children}</div>
 }
 
-// What a state's pack contains, rendered both for "your state" and inside an
-// expanded row under "Other states".
-function StatePack({ code, compact = false }) {
-  const t = useT()
+// ─── Rights: topic grouping ───────────────────────────────────────────────────
+// Federal base + each state pack render as a few plain-language topic groups
+// instead of a wall of citation-titled cards. Federal chunks group by id; state
+// chunks by the id suffix every pack follows (…-rights / -service-plan /
+// -appeals / -agency-waivers / -complaints-pna), with California's bespoke ids
+// folded into the same buckets. Citations move off the card face to a quiet
+// Source line inside the opened card. Only the short title is swapped for a
+// friendlier one; bodies + citations come straight from the vetted corpus.
+const FED_GROUPS_DATA = [
+  { icon: IcInfo, label: 'rtgBasics', items: [['hcbs-overview', 'rtfOverview']] },
+  { icon: IcShield, label: 'rtgCore', items: [
+    ['rights-community', 'rtfCommunity'], ['rights-choice-setting', 'rtfSetting'],
+    ['rights-privacy-dignity', 'rtfPrivacy'], ['rights-autonomy', 'rtfAutonomy'],
+    ['rights-choice-provider', 'rtfProvider'],
+  ] },
+  { icon: IcHome, label: 'rtgHome', items: [
+    ['provider-owned-lease', 'rtfLease'],
+    ['provider-owned-schedule-food-visitors', 'rtfSchedule'],
+    ['modifications', 'rtfMods'],
+  ] },
+  { icon: IcFileText, label: 'rtgPlan', items: [['person-centered-planning', 'rtfPcp']] },
+  { icon: IcUsers, label: 'rtgDay', items: [['day-program-rights', 'rtfDay']] },
+  { icon: IcScale, label: 'rtgAppeals', items: [['fed-fair-hearing', 'rtfHearing']] },
+  { icon: IcHeart, label: 'rtgKids', items: [['fed-epsdt', 'rtfEpsdt']] },
+]
+const STATE_SUFFIX_MAP = {
+  'rights': ['rights', 'rtsRights'], 'lanterman-rights': ['rights', 'rtsRights'],
+  'service-plan': ['plan', 'rtsPlan'], 'ipp': ['plan', 'rtsPlan'],
+  'appeals': ['appeals', 'rtsAppeals'], 'medical-appeals': ['appeals', 'rtsMedAppeals'],
+  'agency-waivers': ['programs', 'rtsPrograms'], 'hcbs-compliance': ['programs', 'rtsCompliance'],
+  'complaints-pna': ['gethelp', 'rtsGetHelp'], 'complaints': ['gethelp', 'rtsGetHelp'],
+}
+const STATE_GROUPS_ORDER = [
+  ['rights', IcShield, 'rtgRights'], ['plan', IcFileText, 'rtgPlan'],
+  ['appeals', IcScale, 'rtgAppeals'], ['programs', IcColumns, 'rtgPrograms'],
+  ['gethelp', IcPhone, 'rtgGetHelp'],
+]
+function fedGroups(t) {
+  const byId = Object.fromEntries(FEDERAL.map((c) => [c.id, c]))
+  return FED_GROUPS_DATA.map((g) => ({
+    icon: g.icon, label: t(g.label),
+    cards: g.items.filter(([id]) => byId[id]).map(([id, tk]) => ({ id, title: t(tk), text: byId[id].text, citation: byId[id].citation })),
+  })).filter((g) => g.cards.length)
+}
+function stateGroups(code, t) {
   const pack = STATES[code]
+  if (!pack) return null
   const name = stateName(code)
-  if (!pack) {
-    return (
-      <div style={{ background: compact ? 'transparent' : C.card, border: compact ? 'none' : `1px solid ${C.border}`, borderRadius: 14, padding: compact ? '0 0 4px' : '14px 16px', fontSize: 14, color: C.sub, lineHeight: 1.6, boxShadow: compact ? 'none' : '0 1px 2px rgba(43,42,40,0.04)' }}>
-        {t('statePackMissing', { name })}
-      </div>
-    )
-  }
+  const buckets = {}
+  const extra = []
+  pack.chunks.forEach((c) => {
+    const suffix = c.id.slice(code.length + 1)
+    const map = STATE_SUFFIX_MAP[suffix]
+    const card = { id: c.id, title: map ? t(map[1], { name }) : c.title, text: c.text, citation: c.citation }
+    if (map) (buckets[map[0]] ||= []).push(card)
+    else extra.push(card)
+  })
+  const out = []
+  STATE_GROUPS_ORDER.forEach(([gk, Icon, labelKey]) => {
+    if (buckets[gk]?.length) out.push({ icon: Icon, label: t(labelKey), cards: buckets[gk] })
+  })
+  if (extra.length) out.push({ icon: IcInfo, label: t('rtgMore'), cards: extra })
+  return out
+}
+// One open card at a time across the whole sheet. Plain title on the face; the
+// legal citation is demoted to a quiet Source line inside the opened body.
+function GroupedRights({ groups }) {
+  const t = useT()
+  const [open, setOpen] = useState(null)
   return (
     <>
-      <ChunkList chunks={pack.chunks} />
-      {pack.serviceCodes.length > 0 && (
-        <>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, margin: '12px 0 8px' }}>{t('commonServiceCodes')}</div>
-          <ServiceCodeList codes={pack.serviceCodes} />
-        </>
-      )}
+      {groups.map((g) => (
+        <div key={g.label} style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '0 2px 9px' }}>
+            <span style={{ width: 30, height: 30, borderRadius: 9, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><g.icon size={17} /></span>
+            <span style={{ fontFamily: serif, fontSize: 16, fontWeight: 700, color: C.ink }}>{g.label}</span>
+          </div>
+          {g.cards.map((c) => {
+            const isOpen = open === c.id
+            return (
+              <div key={c.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+                <button
+                  onClick={() => setOpen(isOpen ? null : c.id)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'transparent', border: 'none', padding: '14px 14px', cursor: 'pointer', textAlign: 'left' }}
+                >
+                  <span style={{ fontSize: 15, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>{c.title}</span>
+                  <IcChevron dir={isOpen ? 'down' : 'right'} size={16} style={{ color: C.accent, flexShrink: 0 }} />
+                </button>
+                {isOpen && (
+                  <div style={{ padding: '0 14px 14px' }}>
+                    <div style={{ fontSize: 14, lineHeight: 1.6, color: C.ink, whiteSpace: 'pre-wrap' }}>{c.text}</div>
+                    {c.citation && (
+                      <div style={{ fontSize: 11.5, color: C.ink3, marginTop: 12, paddingTop: 9, borderTop: `1px solid ${C.line}`, lineHeight: 1.45 }}>
+                        <span style={{ color: C.sub, fontWeight: 700 }}>{t('rtSource')}</span> {c.citation}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      ))}
     </>
   )
 }
+function StateBody({ code }) {
+  const t = useT()
+  const name = stateName(code)
+  const groups = stateGroups(code, t)
+  return (
+    <>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>{t('rtStateIntro', { name })}</div>
+      {groups
+        ? <GroupedRights groups={groups} />
+        : <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 16px', fontSize: 14, color: C.ink, lineHeight: 1.6, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>{t('statePackMissing', { name })}</div>}
+    </>
+  )
+}
+// Big full-width hub card (the state / federal "sorter").
+function HubHero({ icon: Icon, title, sub, onClick }) {
+  return (
+    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left', background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, boxShadow: '0 1px 2px rgba(43,42,40,0.04)', padding: '16px 15px', marginBottom: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+      <span style={{ width: 48, height: 48, borderRadius: 14, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon size={24} /></span>
+      <span style={{ minWidth: 0, flex: 1 }}>
+        <span style={{ display: 'block', fontSize: 17, fontWeight: 700, color: C.ink, lineHeight: 1.2 }}>{title}</span>
+        <span style={{ display: 'block', fontSize: 13, color: C.sub, marginTop: 3, lineHeight: 1.35 }}>{sub}</span>
+      </span>
+      <IcChevron dir="right" size={18} style={{ color: C.accent, flexShrink: 0 }} />
+    </button>
+  )
+}
+function FederalSheet({ onClose }) {
+  const t = useT()
+  return (
+    <Modal onClose={onClose} title={t('rtFederalTitle')}>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>{t('rtFederalIntro')}</div>
+      <GroupedRights groups={fedGroups(t)} />
+    </Modal>
+  )
+}
+function StateSheet({ code, onClose }) {
+  const t = useT()
+  return (
+    <Modal onClose={onClose} title={t('rtStateTitle', { name: stateName(code) })}>
+      <StateBody code={code} />
+    </Modal>
+  )
+}
+function CodesSheet({ code, onClose }) {
+  const t = useT()
+  const pack = STATES[code]
+  return (
+    <Modal onClose={onClose} title={t('rtCodesTitle')}>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('rtCodesIntro')}</div>
+      <ServiceCodeList codes={pack.serviceCodes} />
+      {code === 'CA' && <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t('caFootnote')}</div>}
+    </Modal>
+  )
+}
+function OtherStatesSheet({ currentCode, onClose }) {
+  const t = useT()
+  const [q, setQ] = useState('')
+  const [sel, setSel] = useState(null)
+  if (sel) {
+    return (
+      <Modal onClose={onClose} title={t('rtStateTitle', { name: stateName(sel) })}>
+        <button onClick={() => setSel(null)} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: C.accent, cursor: 'pointer', padding: '2px 2px 12px', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
+          <IcChevron dir="left" size={15} />{t('rtAllStates')}
+        </button>
+        <StateBody code={sel} />
+      </Modal>
+    )
+  }
+  const others = STATE_OPTIONS.filter((o) => o.value !== currentCode)
+  const needle = q.trim().toLowerCase()
+  const list = needle ? others.filter((o) => o.label.toLowerCase().includes(needle)) : others
+  return (
+    <Modal onClose={onClose} title={t('rtOthersTitle')}>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('rtOthersIntro')}</div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('rtSearchStates')} aria-label={t('rtSearchStates')} style={{ ...inputStyle, marginBottom: 12 }} />
+      {list.map((o) => (
+        <button key={o.value} onClick={() => setSel(o.value)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: C.card, border: `1px solid ${C.border}`, borderRadius: 13, padding: '13px 14px', marginBottom: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <span style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{o.label}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+            {stateCovered(o.value) && <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: C.accentSoft, borderRadius: 999, padding: '2px 8px' }}>{t('stateGuide')}</span>}
+            <IcChevron dir="right" size={16} style={{ color: C.accent }} />
+          </span>
+        </button>
+      ))}
+    </Modal>
+  )
+}
 
+// The Rights hub: a calm landing of a few big choices (the vault pattern), not
+// one long scroll. The state / federal "sorter" leads; each card opens a focused
+// sheet of plain-language, grouped guides. The public self-check stays featured.
 function Library({ stateCode, onStateChange, onSaveIncident }) {
   const t = useT()
-  const [openState, setOpenState] = useState(null)
+  const [view, setView] = useState(null) // null | 'state' | 'federal' | 'codes' | 'help' | 'others'
   const [showCheck, setShowCheck] = useState(false)
+  const name = stateName(stateCode)
   const covered = stateCovered(stateCode)
-  const otherStates = STATE_OPTIONS.filter((o) => o.value !== stateCode)
+  const pack = STATES[stateCode]
+  const hasCodes = !!(pack && pack.serviceCodes && pack.serviceCodes.length)
   return (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `10px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ fontFamily: serif, fontSize: 24, fontWeight: 700, margin: '6px 2px 4px' }}>{t('rtHubTitle')}</div>
+      <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('rtHubSub')}</div>
+
       {/* Featured public tool: the home/program self-check (no account needed). */}
       <button
         onClick={() => setShowCheck(true)}
@@ -1716,53 +1912,31 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
         </span>
         <IcChevron dir="right" size={18} style={{ color: C.accent, flexShrink: 0 }} />
       </button>
-      {showCheck && <HomeCheckSheet onClose={() => setShowCheck(false)} onSaveIncident={onSaveIncident} />}
-      <SectionTitle first>{t('yourState')}</SectionTitle>
-      <div style={{ marginBottom: 10 }}>
+
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 2px 8px' }}>{t('rtWhereLive')}</div>
+      <div style={{ marginBottom: 18 }}>
         <Select value={stateCode} onChange={onStateChange} options={STATE_OPTIONS} ariaLabel={t('yourState')} />
       </div>
-      <StatePack code={stateCode} />
-      {covered && stateCode === 'CA' && (
-        <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>
-          {t('caFootnote')}
-        </div>
+
+      <HubHero icon={IcStar} title={t('rtYourStateCard', { name })} sub={covered ? t('rtYourStateSub') : t('rtYourStateSubBase')} onClick={() => setView('state')} />
+      <HubHero icon={IcColumns} title={t('rtFederalCard')} sub={t('rtFederalSub2')} onClick={() => setView('federal')} />
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
+        {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { name })} onClick={() => setView('codes')} />}
+        <VaultTile icon={<IcMap size={22} />} label={t('rtTileOthers')} sub={t('rtTileOthersSub')} onClick={() => setView('others')} />
+        <VaultTile icon={<IcPhone size={22} />} label={t('rtTileHelp')} sub={t('rtTileHelpSub')} onClick={() => setView('help')} />
+      </div>
+
+      {showCheck && <HomeCheckSheet onClose={() => setShowCheck(false)} onSaveIncident={onSaveIncident} />}
+      {view === 'state' && <StateSheet code={stateCode} onClose={() => setView(null)} />}
+      {view === 'federal' && <FederalSheet onClose={() => setView(null)} />}
+      {view === 'codes' && <CodesSheet code={stateCode} onClose={() => setView(null)} />}
+      {view === 'others' && <OtherStatesSheet currentCode={stateCode} onClose={() => setView(null)} />}
+      {view === 'help' && (
+        <Modal onClose={() => setView(null)} title={t('helpContacts')}>
+          <ContactsCard isCA={stateCode === 'CA'} />
+        </Modal>
       )}
-
-      <SectionTitle>{t('federalRights')}</SectionTitle>
-      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
-        {t('federalSub')}
-      </div>
-      <ChunkList chunks={FEDERAL} />
-
-      <SectionTitle>{t('otherStates')}</SectionTitle>
-      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
-        {t('otherStatesSub')}
-      </div>
-      {otherStates.map((o) => {
-        const isOpen = openState === o.value
-        const has = stateCovered(o.value)
-        return (
-          <div key={o.value} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
-            <button
-              onClick={() => setOpenState(isOpen ? null : o.value)}
-              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'transparent', border: 'none', padding: '13px 14px', cursor: 'pointer', textAlign: 'left' }}
-            >
-              <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{o.label}</span>
-                {has && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: C.accentSoft, borderRadius: 999, padding: '2px 8px' }}>{t('stateGuide')}</span>
-                )}
-              </div>
-              <IcChevron dir={isOpen ? 'down' : 'right'} size={16} style={{ color: C.accent, flexShrink: 0 }} />
-            </button>
-            {isOpen && (
-              <div style={{ padding: '0 14px 14px' }}>
-                <StatePack code={o.value} compact />
-              </div>
-            )}
-          </div>
-        )
-      })}
     </div>
   )
 }
