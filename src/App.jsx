@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FEDERAL, STATES, US_STATES } from '../api/_corpus.js'
 import { useCloud, mergeConversations } from './cloud.js'
+import { LANG_OPTIONS, LangContext, getStoredLang, storeLang, useT, tr } from './i18n.js'
 
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
@@ -46,13 +47,7 @@ const IS_TOUCH = typeof window !== 'undefined' && !!window.matchMedia?.('(pointe
 // floating glass nav pill.
 const NAV_CLEARANCE = 'calc(env(safe-area-inset-bottom) + 78px)'
 
-const STARTERS = [
-  'Can my group home lock the fridge?',
-  'Do I have a right to visitors at any time?',
-  'What is service code 510?',
-  'How do I appeal a regional center decision?',
-  'Can I choose my own roommate?',
-]
+const STARTER_KEYS = ['starter1', 'starter2', 'starter3', 'starter4', 'starter5']
 
 const serif = "Georgia, 'Times New Roman', serif"
 
@@ -83,15 +78,15 @@ function genId() {
   }
 }
 
-function timeAgo(ms) {
+function timeAgo(ms, t) {
   const s = Math.floor((Date.now() - ms) / 1000)
-  if (s < 60) return 'Just now'
+  if (s < 60) return t('justNow')
   const m = Math.floor(s / 60)
-  if (m < 60) return `${m} min ago`
+  if (m < 60) return t('minAgo', { n: m })
   const h = Math.floor(m / 60)
-  if (h < 24) return `${h} hr ago`
+  if (h < 24) return t('hrAgo', { n: h })
   const d = Math.floor(h / 24)
-  if (d < 7) return `${d} day${d > 1 ? 's' : ''} ago`
+  if (d < 7) return t(d > 1 ? 'daysAgo' : 'dayAgo', { n: d })
   return new Date(ms).toLocaleDateString()
 }
 
@@ -843,6 +838,9 @@ export default function App() {
     setStateCode(code)
     try { localStorage.setItem(STATE_KEY, code) } catch { /* just won't persist */ }
   }
+  // UI language; the model is also instructed to answer in it (lang sent per call).
+  const [lang, setLang] = useState(getStoredLang)
+  const chooseLang = (code) => { setLang(code); storeLang(code) }
 
   const cloud = useCloud()
 
@@ -913,16 +911,17 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           state: stateCode || 'CA',
+          lang,
           messages: next.map(({ role, content }) => ({ role, content })),
         }),
       })
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data.error || 'Something went wrong. Please try again.')
+      if (!r.ok) throw new Error(data.error || tr('errGeneric'))
       const withAnswer = [...next, { role: 'assistant', content: data.reply, sources: data.sources || [] }]
       setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: withAnswer } : c)))
       return true
     } catch (e) {
-      setError(e.message || 'Something went wrong. Please try again.')
+      setError(e.message || tr('errGeneric'))
       setConversations((prev) =>
         prev.map((c) => (c.id === convId ? { ...c, messages: base } : c)).filter((c) => c.messages.length > 0)
       )
@@ -962,6 +961,7 @@ export default function App() {
         body: JSON.stringify({
           state: base,
           compareTo: target,
+          lang,
           messages: [
             { role: 'user', content: question.content },
             { role: 'assistant', content: answer.content },
@@ -970,10 +970,10 @@ export default function App() {
         }),
       })
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data.error || 'Could not compare right now. Please try again.')
+      if (!r.ok) throw new Error(data.error || tr('errCompare'))
       patch({ state: target, text: data.reply, sources: data.sources || [] })
     } catch (e) {
-      patch({ state: target, error: e.message || 'Could not compare right now. Please try again.' })
+      patch({ state: target, error: e.message || tr('errCompare') })
     }
   }
 
@@ -1003,6 +1003,7 @@ export default function App() {
   return (
     // Fixed full-viewport shell (Book-app recipe) - the page itself is static;
     // only the inner scroll areas move.
+    <LangContext.Provider value={lang}>
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', background: C.bg, color: C.ink, fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif" }}>
       <div style={{ width: '100%', maxWidth: 680, margin: '0 auto', height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Header onSettings={() => setShowSettings(true)} onCloud={() => setShowCloud(true)} connected={cloud.status === 'ready'} />
@@ -1017,10 +1018,13 @@ export default function App() {
           onClose={() => setShowSettings(false)}
           count={conversations.length}
           onDeleteAll={deleteAllConversations}
+          lang={lang}
+          onLangChange={chooseLang}
         />
       )}
       {showCloud && <CloudSheet onClose={() => setShowCloud(false)} cloud={cloud} />}
     </div>
+    </LangContext.Provider>
   )
 }
 
@@ -1044,15 +1048,16 @@ function IconBtn({ label, onClick, children }) {
 }
 
 function Header({ onSettings, onCloud, connected }) {
+  const t = useT()
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0', flexShrink: 0 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: 0.2 }}>HandBook</div>
-          <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>Your HCBS rights, in plain language</div>
+          <div style={{ fontSize: 13, color: C.sub, marginTop: 2 }}>{t('tagline')}</div>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0, paddingTop: 2 }}>
-          <IconBtn label={connected ? 'Account (synced)' : 'Cloud sync'} onClick={onCloud}>
+          <IconBtn label={connected ? t('accountSynced') : t('cloudSync')} onClick={onCloud}>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
               <IcCloud size={19} style={connected ? { color: C.accent } : undefined} />
               {connected && (
@@ -1060,21 +1065,22 @@ function Header({ onSettings, onCloud, connected }) {
               )}
             </span>
           </IconBtn>
-          <IconBtn label="Settings" onClick={onSettings}><IcSettings size={19} /></IconBtn>
+          <IconBtn label={t('settings')} onClick={onSettings}><IcSettings size={19} /></IconBtn>
         </div>
       </div>
       <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '8px 12px', margin: '12px 0 0', lineHeight: 1.45 }}>
-        General information, not legal advice. Your saved history stays on this device only. Please don't include names or other personal details.
+        {t('disclaimer')}
       </div>
     </div>
   )
 }
 
 function Nav({ tab, setTab, onAsk }) {
+  const t = useT()
   const items = [
-    { key: 'chat', label: 'Ask', onClick: onAsk },
-    { key: 'history', label: 'History', onClick: () => setTab('history') },
-    { key: 'library', label: 'Rights', onClick: () => setTab('library') },
+    { key: 'chat', label: t('navAsk'), onClick: onAsk },
+    { key: 'history', label: t('navHistory'), onClick: () => setTab('history') },
+    { key: 'library', label: t('navRights'), onClick: () => setTab('library') },
   ]
   return (
     <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'max(env(safe-area-inset-bottom), 12px)', display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
@@ -1115,26 +1121,28 @@ function Nav({ tab, setTab, onAsk }) {
 // Compact "Answering for [state]" chooser - the same Select used everywhere,
 // shrunk to a pill so it reads as a setting, not a form field.
 function StateBar({ stateCode, onStateChange }) {
+  const t = useT()
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 0', flexShrink: 0 }}>
-      <span style={{ fontSize: 13, color: C.sub, flexShrink: 0 }}>Answering for</span>
+      <span style={{ fontSize: 13, color: C.sub, flexShrink: 0 }}>{t('answeringFor')}</span>
       <div style={{ flex: 1, minWidth: 0, maxWidth: 240 }}>
         <Select
           value={stateCode}
           onChange={onStateChange}
           options={STATE_OPTIONS}
-          ariaLabel="State"
+          ariaLabel={t('state')}
           style={{ padding: '7px 11px', borderRadius: 999, fontSize: 14 }}
         />
       </div>
       {!stateCovered(stateCode) && (
-        <span style={{ fontSize: 12, color: C.ink3, flexShrink: 0 }}>federal rules only</span>
+        <span style={{ fontSize: 12, color: C.ink3, flexShrink: 0 }}>{t('federalOnly')}</span>
       )}
     </div>
   )
 }
 
 function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onStateChange, onCompare }) {
+  const t = useT()
   const [input, setInput] = useState('')
   const scrollRef = useRef(null)
   const lastMsgRef = useRef(null)
@@ -1185,11 +1193,11 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
           <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '16px 16px 8px', WebkitOverflowScrolling: 'touch' }}>
             {messages.length === 0 && (
               <div style={{ marginTop: 18 }}>
-                <div style={{ fontSize: 14, color: C.sub, marginBottom: 10 }}>Try asking:</div>
+                <div style={{ fontSize: 14, color: C.sub, marginBottom: 10 }}>{t('tryAsking')}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                  {STARTERS.map((s) => (
-                    <button key={s} onClick={() => submit(s)} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.ink, borderRadius: 12, padding: '10px 13px', fontSize: 14, cursor: 'pointer', textAlign: 'left', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
-                      {s}
+                  {STARTER_KEYS.map((k) => (
+                    <button key={k} onClick={() => submit(t(k))} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.ink, borderRadius: 12, padding: '10px 13px', fontSize: 14, cursor: 'pointer', textAlign: 'left', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+                      {t(k)}
                     </button>
                   ))}
                 </div>
@@ -1205,7 +1213,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
               />
             ))}
             <div style={{ minHeight: 26, padding: '2px 4px' }}>
-              {busy && <span style={{ fontSize: 13, color: C.sub }}>Looking that up…</span>}
+              {busy && <span style={{ fontSize: 13, color: C.sub }}>{t('lookingUp')}</span>}
               {!busy && error && <span style={{ fontSize: 13, color: C.danger }}>{error}</span>}
             </div>
           </div>
@@ -1226,7 +1234,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input) } }}
-              placeholder="Ask about your rights…"
+              placeholder={t('composerPlaceholder')}
               rows={1}
               style={{ ...inputStyle, resize: 'none', borderRadius: 14, padding: '12px 14px', lineHeight: 1.4, maxHeight: 120 }}
             />
@@ -1236,7 +1244,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
             disabled={busy || !input.trim()}
             style={{ background: busy || !input.trim() ? C.line : C.accent, color: '#fff', border: 'none', borderRadius: 14, padding: '13px 18px', fontSize: 15, fontWeight: 700, cursor: busy || !input.trim() ? 'default' : 'pointer', marginBottom: 4 }}
           >
-            Ask
+            {t('ask')}
           </button>
         </form>
       </div>
@@ -1297,6 +1305,7 @@ function SourceChips({ sources }) {
 // one comparison call and renders that state's angle in a card. Result lives
 // on the message so it persists with the saved conversation.
 function CompareBlock({ compare, baseState, onCompare }) {
+  const t = useT()
   // Only states with a vetted state guide can actually DIFFER from your state;
   // everywhere else runs on the same federal floor, so listing them would just
   // produce 49 copies of "the federal baseline applies". The dropdown grows as
@@ -1310,8 +1319,8 @@ function CompareBlock({ compare, baseState, onCompare }) {
             value={compare?.state || ''}
             onChange={onCompare}
             options={options}
-            placeholder="See another state's take…"
-            ariaLabel="Compare with another state"
+            placeholder={t('compareSelect')}
+            ariaLabel={t('compareAria')}
             style={{ padding: '7px 11px', borderRadius: 999, fontSize: 13 }}
           />
         </div>
@@ -1321,16 +1330,16 @@ function CompareBlock({ compare, baseState, onCompare }) {
         // as broken. This line is replaced by the dropdown automatically as
         // state guides are added.
         <div style={{ fontSize: 12, color: C.ink3, lineHeight: 1.5 }}>
-          Other states currently follow the same federal baseline. State-to-state comparisons will appear here as state guides are added.
+          {t('compareEmpty')}
         </div>
       )}
       {compare && (
         <div style={{ marginTop: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 13px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 4 }}>
-            {stateName(compare.state)}{stateCovered(compare.state) ? '' : ' · federal rules only'}
+            {stateName(compare.state)}{stateCovered(compare.state) ? '' : ` · ${t('federalOnly')}`}
           </div>
           {compare.loading ? (
-            <div style={{ fontSize: 13, color: C.sub }}>Comparing…</div>
+            <div style={{ fontSize: 13, color: C.sub }}>{t('comparing')}</div>
           ) : compare.error ? (
             <div style={{ fontSize: 13, color: C.danger }}>{compare.error}</div>
           ) : (
@@ -1372,16 +1381,17 @@ const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref
 })
 
 function History({ conversations, onOpen, onDelete }) {
+  const t = useT()
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
-      <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>Saved questions</div>
+      <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>{t('savedQuestions')}</div>
       {conversations.length === 0 ? (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
-          Your questions are saved here so you can come back to an answer later. Ask something in the Ask tab to get started.
+          {t('historyEmpty')}
         </div>
       ) : (
         conversations.map((conv) => {
-          const firstQ = (conv.messages.find((m) => m.role === 'user') || {}).content || 'Conversation'
+          const firstQ = (conv.messages.find((m) => m.role === 'user') || {}).content || t('conversation')
           const qCount = conv.messages.filter((m) => m.role === 'user').length
           return (
             // Swipe left to reveal Delete (GuestBook cards). Desktop keeps a
@@ -1389,17 +1399,17 @@ function History({ conversations, onOpen, onDelete }) {
             <SwipeableRow
               key={conv.id}
               onTap={() => onOpen(conv.id)}
-              actions={[{ label: 'Delete', color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDelete(conv.id) }]}
+              actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDelete(conv.id) }]}
             >
               <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
                 <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', textAlign: 'left', cursor: 'pointer' }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{firstQ}</div>
-                  <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>{timeAgo(conv.createdAt)} · {qCount} question{qCount > 1 ? 's' : ''}</div>
+                  <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>{timeAgo(conv.createdAt, t)} · {qCount} {qCount > 1 ? t('questionN') : t('question1')}</div>
                 </div>
                 {!IS_TOUCH && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onDelete(conv.id) }}
-                    aria-label="Delete conversation"
+                    aria-label={t('deleteConversation')}
                     style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, background: 'transparent', border: 'none', borderLeft: `1px solid ${C.line}`, color: C.sub, cursor: 'pointer' }}
                   >
                     <IcTrash size={16} />
@@ -1412,7 +1422,7 @@ function History({ conversations, onOpen, onDelete }) {
       )}
       {conversations.length > 0 && (
         <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>
-          {IS_TOUCH ? 'Swipe a question left to delete it. ' : ''}Saved on this device only. The {MAX_CONVERSATIONS} most recent conversations are kept.
+          {IS_TOUCH ? t('swipeHint') : ''}{t('historyFooter', { n: MAX_CONVERSATIONS })}
         </div>
       )}
     </div>
@@ -1468,12 +1478,13 @@ function SectionTitle({ children, first = false }) {
 // What a state's pack contains, rendered both for "your state" and inside an
 // expanded row under "Other states".
 function StatePack({ code, compact = false }) {
+  const t = useT()
   const pack = STATES[code]
   const name = stateName(code)
   if (!pack) {
     return (
       <div style={{ background: compact ? 'transparent' : C.card, border: compact ? 'none' : `1px solid ${C.border}`, borderRadius: 14, padding: compact ? '0 0 4px' : '14px 16px', fontSize: 14, color: C.sub, lineHeight: 1.6, boxShadow: compact ? 'none' : '0 1px 2px rgba(43,42,40,0.04)' }}>
-        {name}-specific rules aren't loaded yet. The federal HCBS rights below apply in {name} too, and answers for {name} use that federal baseline. For state specifics, contact {name}'s Medicaid or developmental-disabilities agency, or your local Protection and Advocacy office (find yours at ndrn.org).
+        {t('statePackMissing', { name })}
       </div>
     )
   }
@@ -1482,7 +1493,7 @@ function StatePack({ code, compact = false }) {
       <ChunkList chunks={pack.chunks} />
       {pack.serviceCodes.length > 0 && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, margin: '12px 0 8px' }}>Common service codes</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, margin: '12px 0 8px' }}>{t('commonServiceCodes')}</div>
           <ServiceCodeList codes={pack.serviceCodes} />
         </>
       )}
@@ -1491,31 +1502,32 @@ function StatePack({ code, compact = false }) {
 }
 
 function Library({ stateCode, onStateChange }) {
+  const t = useT()
   const [openState, setOpenState] = useState(null)
   const covered = stateCovered(stateCode)
   const otherStates = STATE_OPTIONS.filter((o) => o.value !== stateCode)
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
-      <SectionTitle first>Your state</SectionTitle>
+      <SectionTitle first>{t('yourState')}</SectionTitle>
       <div style={{ marginBottom: 10 }}>
-        <Select value={stateCode} onChange={onStateChange} options={STATE_OPTIONS} ariaLabel="Your state" />
+        <Select value={stateCode} onChange={onStateChange} options={STATE_OPTIONS} ariaLabel={t('yourState')} />
       </div>
       <StatePack code={stateCode} />
       {covered && stateCode === 'CA' && (
         <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>
-          Partial service-code list. The full crosswalk is published by the CA Department of Developmental Services at dds.ca.gov. Free advocacy help: OCRA at Disability Rights California, 1-800-390-7032.
+          {t('caFootnote')}
         </div>
       )}
 
-      <SectionTitle>Federal rights (all states)</SectionTitle>
+      <SectionTitle>{t('federalRights')}</SectionTitle>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
-        The federal HCBS Settings Rule applies in every state and is the floor your state builds on.
+        {t('federalSub')}
       </div>
       <ChunkList chunks={FEDERAL} />
 
-      <SectionTitle>Other states</SectionTitle>
+      <SectionTitle>{t('otherStates')}</SectionTitle>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
-        Tap a state to see what HandBook has for it. Every state gets the federal rights above; state-specific guides are added as the team vets them.
+        {t('otherStatesSub')}
       </div>
       {otherStates.map((o) => {
         const isOpen = openState === o.value
@@ -1529,7 +1541,7 @@ function Library({ stateCode, onStateChange }) {
               <div style={{ minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{o.label}</span>
                 {has && (
-                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: C.accentSoft, borderRadius: 999, padding: '2px 8px' }}>State guide</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: C.accentSoft, borderRadius: 999, padding: '2px 8px' }}>{t('stateGuide')}</span>
                 )}
               </div>
               <IcChevron dir={isOpen ? 'down' : 'right'} size={16} style={{ color: C.accent, flexShrink: 0 }} />
@@ -1556,21 +1568,25 @@ function SheetSection({ title, children }) {
   )
 }
 
-function SettingsSheet({ onClose, count, onDeleteAll }) {
+function SettingsSheet({ onClose, count, onDeleteAll, lang, onLangChange }) {
+  const t = useT()
   // Two-tap destructive confirm ON the same button (label swap, no layout
   // reflow); auto-resets after a beat.
   const [confirming, setConfirming] = useState(false)
   useEffect(() => {
     if (!confirming) return
-    const t = setTimeout(() => setConfirming(false), 3500)
-    return () => clearTimeout(t)
+    const tm = setTimeout(() => setConfirming(false), 3500)
+    return () => clearTimeout(tm)
   }, [confirming])
 
   return (
-    <Modal onClose={onClose} title="Settings">
-      <SheetSection title="Saved questions">
+    <Modal onClose={onClose} title={t('settings')}>
+      <SheetSection title={t('language')}>
+        <Select value={lang} onChange={onLangChange} options={LANG_OPTIONS} ariaLabel={t('language')} />
+      </SheetSection>
+      <SheetSection title={t('savedQuestions')}>
         <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 12, padding: '12px 14px', fontSize: 14, color: C.ink, marginBottom: 8 }}>
-          {count === 0 ? 'No saved questions on this device.' : `${count} conversation${count > 1 ? 's' : ''} saved on this device.`}
+          {count === 0 ? t('noSaved') : t(count > 1 ? 'savedCountN' : 'savedCount1', { n: count })}
         </div>
         <button
           disabled={count === 0}
@@ -1588,18 +1604,16 @@ function SettingsSheet({ onClose, count, onDeleteAll }) {
             cursor: count === 0 ? 'default' : 'pointer', transition: 'background 0.15s ease, color 0.15s ease',
           }}
         >
-          {confirming ? 'Tap again to delete everything' : 'Delete all saved questions'}
+          {confirming ? t('tapAgainDelete') : t('deleteAll')}
         </button>
       </SheetSection>
-      <SheetSection title="About">
+      <SheetSection title={t('about')}>
         <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
-          HandBook explains Home and Community-Based Services (HCBS) rights in plain language, grounded in the
-          federal Settings Rule and California's Lanterman Act. It offers general information, not legal advice.
+          {t('aboutBody1')}
           <br /><br />
-          Questions you ask are answered by an AI model and are not stored on any HandBook server. Saved history
-          lives only on this device. Please don't include names or other personal details.
+          {t('aboutBody2')}
           <br /><br />
-          Free advocacy help: OCRA at Disability Rights California, 1-800-390-7032 · dds.ca.gov
+          {t('aboutBody3')}
         </div>
       </SheetSection>
     </Modal>
@@ -1610,19 +1624,19 @@ function SettingsSheet({ onClose, count, onDeleteAll }) {
 // without picking keeps the California default (and persists it, so the prompt
 // never nags); the choice is always changeable from the Ask and Rights pages.
 function StatePrompt({ onChoose }) {
+  const t = useT()
   const [picked, setPicked] = useState('')
   return (
-    <Modal onClose={() => onChoose('CA')} title="Where do you live?">
+    <Modal onClose={() => onChoose('CA')} title={t('whereLive')}>
       <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>
-        HCBS rights start with the same federal rules everywhere, but each state runs its own program.
-        Pick your state so answers fit where you live. You can change it anytime.
+        {t('whereLiveBody')}
       </div>
       <Select
         value={picked}
         onChange={setPicked}
         options={STATE_OPTIONS}
-        placeholder="Choose your state…"
-        ariaLabel="Your state"
+        placeholder={t('chooseState')}
+        ariaLabel={t('yourState')}
       />
       <button
         onClick={() => onChoose(picked || 'CA')}
@@ -1632,7 +1646,7 @@ function StatePrompt({ onChoose }) {
           padding: '13px 14px', fontSize: 15, fontWeight: 700, cursor: 'pointer',
         }}
       >
-        {picked ? 'Continue' : 'Skip - use California'}
+        {picked ? t('continue') : t('skipUseCA')}
       </button>
     </Modal>
   )
@@ -1659,48 +1673,53 @@ function CloudNote({ error }) {
 }
 
 function CloudSheet({ onClose, cloud }) {
+  const t = useT()
   const { status, pinMode, email, error, busy } = cloud
   const [emailInput, setEmailInput] = useState(email || '')
   const [code, setCode] = useState('')
   const [pin, setPin] = useState('')
 
+  // Render a translated string containing {email} with the address bolded.
+  const withEmail = (key) => {
+    const [before, after] = t(key).split('{email}')
+    return (<>{before}<strong>{email}</strong>{after}</>)
+  }
+
   // Configuration missing (no Supabase env) - keep the honest coming-soon copy.
   if (status === 'off') {
     return (
-      <Modal onClose={onClose} title="Account">
+      <Modal onClose={onClose} title={t('account')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <span style={{ display: 'inline-flex', width: 8, height: 8, borderRadius: '50%', background: C.lineHard }} />
-          <span style={{ fontSize: 14, fontWeight: 600, color: C.sub }}>Not connected</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: C.sub }}>{t('notConnected')}</span>
         </div>
         <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 4 }}>
-          HandBook works fully on this device without an account - nothing you do here requires one.
+          {t('offBody1')}
         </div>
         <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6 }}>
-          Optional accounts are coming soon. Signing in will keep your saved questions indefinitely
-          across devices - and everything stays private to you.
+          {t('offBody2')}
         </div>
       </Modal>
     )
   }
 
   const pinCopy = {
-    setup: { title: 'Create a PIN', sub: 'This 4-digit PIN encrypts your history. Only you can unlock it - we can never read it, so keep it somewhere safe.', cta: 'Set PIN' },
-    unlock: { title: 'Enter your PIN', sub: 'Unlock your saved history on this device.', cta: 'Unlock' },
-    recover: { title: 'Enter your PIN', sub: 'Enter the PIN you created to restore your history on this device.', cta: 'Restore' },
+    setup: { title: t('pinSetupTitle'), sub: t('pinSetupSub'), cta: t('pinSetupCta') },
+    unlock: { title: t('pinUnlockTitle'), sub: t('pinUnlockSub'), cta: t('pinUnlockCta') },
+    recover: { title: t('pinUnlockTitle'), sub: t('pinRecoverSub'), cta: t('pinRecoverCta') },
   }[pinMode] || {}
 
   return (
-    <Modal onClose={onClose} title="Account">
+    <Modal onClose={onClose} title={t('account')}>
       {status === 'signed_out' && (
         <div>
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 4 }}>
-            Sign in to keep your saved questions indefinitely and across devices. Everything is
-            end-to-end encrypted - private to you.
+            {t('signInBody')}
           </div>
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>
-            HandBook works fully without an account; this only adds cloud history.
+            {t('signInSub')}
           </div>
-          <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>Email</label>
+          <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>{t('email')}</label>
           <input
             type="email" inputMode="email" autoComplete="email" placeholder="you@example.com"
             value={emailInput} onChange={(e) => setEmailInput(e.target.value)}
@@ -1709,7 +1728,7 @@ function CloudSheet({ onClose, cloud }) {
           />
           <CloudNote error={error} />
           <button disabled={busy} onClick={() => cloud.sendCode(emailInput)} style={{ ...cloudBtn('primary'), marginTop: 12, opacity: busy ? 0.6 : 1 }}>
-            {busy ? 'Sending…' : 'Email me a code'}
+            {busy ? t('sending') : t('emailMeCode')}
           </button>
         </div>
       )}
@@ -1717,9 +1736,9 @@ function CloudSheet({ onClose, cloud }) {
       {status === 'code_sent' && (
         <div>
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 16 }}>
-            We emailed a code to <strong>{email}</strong>. Enter it below.
+            {withEmail('codeSentBody')}
           </div>
-          <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>Code</label>
+          <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>{t('code')}</label>
           <input
             type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="12345678" maxLength={10}
             value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
@@ -1728,10 +1747,10 @@ function CloudSheet({ onClose, cloud }) {
           />
           <CloudNote error={error} />
           <button disabled={busy} onClick={() => cloud.verifyCode(code)} style={{ ...cloudBtn('primary'), marginTop: 12, opacity: busy ? 0.6 : 1 }}>
-            {busy ? 'Verifying…' : 'Verify'}
+            {busy ? t('verifying') : t('verify')}
           </button>
           <button onClick={() => cloud.restart()} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>
-            Use a different email
+            {t('useDifferentEmail')}
           </button>
         </div>
       )}
@@ -1752,10 +1771,10 @@ function CloudSheet({ onClose, cloud }) {
             onClick={() => cloud.submitPin(pin)}
             style={{ ...cloudBtn('primary'), marginTop: 12, opacity: (busy || pin.length !== 4) ? 0.6 : 1 }}
           >
-            {busy ? 'Working…' : pinCopy.cta}
+            {busy ? t('working') : pinCopy.cta}
           </button>
           <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>
-            Sign out
+            {t('signOut')}
           </button>
         </div>
       )}
@@ -1764,17 +1783,16 @@ function CloudSheet({ onClose, cloud }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
             <span style={{ display: 'inline-flex', width: 8, height: 8, borderRadius: '50%', background: C.accent }} />
-            <span style={{ fontSize: 14, fontWeight: 600, color: C.accent }}>Synced</span>
+            <span style={{ fontSize: 14, fontWeight: 600, color: C.accent }}>{t('synced')}</span>
           </div>
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 4 }}>
-            Signed in as <strong>{email}</strong>. Your history is saved to your account and
-            encrypted so only you can read it.
+            {withEmail('readyBody')}
           </div>
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>
-            Lock hides your history until you re-enter your PIN. Sign out removes it from this device.
+            {t('readySub')}
           </div>
-          <button onClick={() => { cloud.lock(); onClose() }} style={cloudBtn('secondary')}>Lock</button>
-          <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 8, color: C.danger }}>Sign out</button>
+          <button onClick={() => { cloud.lock(); onClose() }} style={cloudBtn('secondary')}>{t('lock')}</button>
+          <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 8, color: C.danger }}>{t('signOut')}</button>
         </div>
       )}
     </Modal>

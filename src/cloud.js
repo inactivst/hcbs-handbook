@@ -6,6 +6,7 @@
 // See [[pin-vault-auth-port-recipe]] + [[dev-sandbox-supabase-org]].
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from './supabase.js'
+import { tr } from './i18n.js'
 import {
   createVaultKey, wrapVaultKeyWithPin, unwrapVaultKeyWithPin,
   encryptStr, decryptStr, newSalt, saltToB64, saltFromB64,
@@ -79,7 +80,7 @@ export function useCloud() {
 
   const sendCode = useCallback(async (rawEmail) => {
     const addr = (rawEmail || '').trim().toLowerCase()
-    if (!addr) { setError('Enter your email.'); return }
+    if (!addr) { setError(tr('errEnterEmail')); return }
     setBusy(true); setError('')
     try {
       const { error: e } = await supabase.auth.signInWithOtp({
@@ -89,13 +90,13 @@ export function useCloud() {
       localEmail.set(addr); setEmail(addr)
       setStatus('code_sent')
     } catch (e) {
-      setError(e?.message || 'Could not send the code. Please try again.')
+      setError(e?.message || tr('errSendCode'))
     } finally { setBusy(false) }
   }, [])
 
   const verifyCode = useCallback(async (code) => {
     const token = (code || '').trim()
-    if (!token) { setError('Enter the code from the email.'); return }
+    if (!token) { setError(tr('errEnterCode')); return }
     setBusy(true); setError('')
     try {
       const { data, error: e } = await supabase.auth.verifyOtp({
@@ -106,7 +107,7 @@ export function useCloud() {
       userRef.current = user
       await routeAfterAuth(user)
     } catch (e) {
-      setError(e?.message || 'That code did not work. Check it and try again.')
+      setError(e?.message || tr('errBadCode'))
     } finally { setBusy(false) }
   }, [email, routeAfterAuth])
 
@@ -138,7 +139,7 @@ export function useCloud() {
         const { data: profile, error: e } = await supabase
           .from('profiles').select('kdf_salt, encrypted_vault_key').eq('id', user.id).maybeSingle()
         if (e) throw e
-        if (!profile?.encrypted_vault_key) { setPinMode('setup'); setError('Set a PIN to finish setting up.'); return }
+        if (!profile?.encrypted_vault_key) { setPinMode('setup'); setError(tr('errPinFinish')); return }
         const salt = saltFromB64(profile.kdf_salt)
         const vaultKey = await unwrapVaultKeyWithPin(profile.encrypted_vault_key, pin, salt)
         // Mirror the wrapped key locally so future unlocks are offline + instant.
@@ -150,8 +151,8 @@ export function useCloud() {
       // A failed unwrap is almost always a wrong PIN — report it as that, and
       // never clobber the stored wrapped key on failure.
       setError(pinMode === 'setup'
-        ? (e?.message || 'Could not set up your PIN. Please try again.')
-        : 'That PIN did not work. Try again.')
+        ? (e?.message || tr('errPinSetup'))
+        : tr('errPinWrong'))
     } finally { setBusy(false) }
   }, [pinMode])
 
