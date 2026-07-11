@@ -298,7 +298,7 @@ export default async function handler(req, res) {
   // App language: answer in the user's language. The corpus and citations stay
   // English; the model translates the explanation. Whitelist the codes we ship
   // so a crafted `lang` can't inject arbitrary prompt text.
-  const LANGUAGE_NAMES = { es: 'Spanish' }
+  const LANGUAGE_NAMES = { es: 'Spanish', tl: 'Tagalog (Filipino)' }
   const langName = LANGUAGE_NAMES[typeof req.body?.lang === 'string' ? req.body.lang : 'en']
   const langBlock = langName
     ? `\n\nLANGUAGE: The person's app is set to ${langName}. Write your ENTIRE answer in plain, simple ${langName} (aim for an easy reading level). Keep legal citations exactly as written in the excerpts (e.g., "42 CFR 441.301(c)(4)", "WIC 4710.5") and keep agency names, phone numbers, and program names as-is, with a short ${langName} description where helpful.`

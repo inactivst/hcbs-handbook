@@ -177,31 +177,32 @@ export function useCloud() {
 
   const restart = useCallback(() => { setError(''); setStatus('signed_out'); setPinMode('setup') }, [])
 
-  // ─── History sync (E2E) ────────────────────────────────────────────────────
-  // Each conversation is one encrypted row in vault_items (kind='history'),
-  // keyed by the conversation's own UUID so upserts are idempotent per device.
-  const pushConversations = useCallback(async (list) => {
+  // ─── Vault item sync (E2E) ──────────────────────────────────────────────────
+  // Every vault record (conversation history, incident log entries, …) is one
+  // encrypted row in vault_items, keyed by the record's own UUID so upserts are
+  // idempotent per device and `kind` separates the collections.
+  const pushItems = useCallback(async (kind, list) => {
     const key = keyRef.current, user = userRef.current
     if (!key || !user || !supabase || !Array.isArray(list)) return
     const rows = []
-    for (const conv of list) {
-      if (!isUuid(conv?.id)) continue // fallback non-uuid ids stay device-local
+    for (const item of list) {
+      if (!isUuid(item?.id)) continue // fallback non-uuid ids stay device-local
       rows.push({
-        id: conv.id, user_id: user.id, kind: 'history',
-        ciphertext: JSON.stringify(await encryptStr(JSON.stringify(conv), key)),
+        id: item.id, user_id: user.id, kind,
+        ciphertext: JSON.stringify(await encryptStr(JSON.stringify(item), key)),
       })
     }
     if (!rows.length) return
     try { await supabase.from('vault_items').upsert(rows) } catch { /* offline: retries next change */ }
   }, [])
 
-  const pullConversations = useCallback(async () => {
+  const pullItems = useCallback(async (kind) => {
     const key = keyRef.current, user = userRef.current
     if (!key || !user || !supabase) return []
     let data = null
     try {
       const res = await supabase
-        .from('vault_items').select('id, ciphertext').eq('user_id', user.id).eq('kind', 'history')
+        .from('vault_items').select('id, ciphertext').eq('user_id', user.id).eq('kind', kind)
       data = res.data
     } catch { return [] }
     const out = []
@@ -209,18 +210,30 @@ export function useCloud() {
       try {
         const plain = await decryptStr(JSON.parse(row.ciphertext), key)
         if (!plain) continue
-        const conv = JSON.parse(plain)
-        if (conv && conv.id) out.push(conv)
+        const item = JSON.parse(plain)
+        if (item && item.id) out.push(item)
       } catch { /* skip an unreadable row */ }
     }
     return out
   }, [])
+
+  // Hard-delete one vault row (RLS restricts to the owner's rows). Upsert-based
+  // sync never removes rows, so deletes must be explicit or they resurrect.
+  const deleteItem = useCallback(async (id) => {
+    const user = userRef.current
+    if (!user || !supabase || !isUuid(id)) return
+    try { await supabase.from('vault_items').delete().eq('id', id) } catch { /* offline: row lingers but stays deleted locally */ }
+  }, [])
+
+  const pushConversations = useCallback((list) => pushItems('history', list), [pushItems])
+  const pullConversations = useCallback(() => pullItems('history'), [pullItems])
 
   return {
     status, pinMode, email, error, busy,
     setEmail, setError,
     sendCode, verifyCode, submitPin, lock, signOut, restart,
     pushConversations, pullConversations,
+    pushItems, pullItems, deleteItem,
     hasKey: () => !!keyRef.current,
   }
 }

@@ -886,6 +886,41 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversations, cloud.status])
 
+  // ─── Vault: incident log (cloud-only, E2E) ──────────────────────────────────
+  // Loaded fresh from the account on every unlock; cleared from memory the
+  // moment the vault locks. Never persisted plaintext on the device.
+  const [incidents, setIncidents] = useState([])
+  const incidentsLoadedRef = useRef(false)
+  useEffect(() => {
+    if (cloud.status !== 'ready') { incidentsLoadedRef.current = false; setIncidents([]); return }
+    let alive = true
+    ;(async () => {
+      const list = await cloud.pullItems('incident')
+      if (!alive) return
+      setIncidents(incidentSort(list))
+      incidentsLoadedRef.current = true
+    })()
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloud.status])
+  useEffect(() => {
+    if (cloud.status !== 'ready' || !incidentsLoadedRef.current) return
+    const t = setTimeout(() => cloud.pushItems('incident', incidents), 800)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incidents, cloud.status])
+
+  function saveIncident(rec) {
+    setIncidents((prev) => incidentSort(
+      rec.id ? prev.map((i) => (i.id === rec.id ? { ...i, ...rec } : i))
+             : [{ ...rec, id: genId(), createdAt: Date.now() }, ...prev]
+    ))
+  }
+  function deleteIncident(id) {
+    setIncidents((prev) => prev.filter((i) => i.id !== id))
+    cloud.deleteItem(id)
+  }
+
   const activeMessages = (activeId ? conversations.find((c) => c.id === activeId)?.messages : null) || []
 
   async function send(text) {
@@ -1010,6 +1045,15 @@ export default function App() {
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
         {tab === 'history' && <History conversations={conversations} onOpen={openConversation} onDelete={deleteConversation} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
+        {tab === 'vault' && (
+          <VaultPage
+            cloud={cloud}
+            incidents={incidents}
+            onSaveIncident={saveIncident}
+            onDeleteIncident={deleteIncident}
+            onOpenAccount={() => setShowCloud(true)}
+          />
+        )}
       </div>
       <Nav tab={tab} setTab={setTab} onAsk={startNew} />
       {!stateCode && <StatePrompt onChoose={chooseState} />}
@@ -1081,6 +1125,7 @@ function Nav({ tab, setTab, onAsk }) {
     { key: 'chat', label: t('navAsk'), onClick: onAsk },
     { key: 'history', label: t('navHistory'), onClick: () => setTab('history') },
     { key: 'library', label: t('navRights'), onClick: () => setTab('library') },
+    { key: 'vault', label: t('navVault'), onClick: () => setTab('vault') },
   ]
   return (
     <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'max(env(safe-area-inset-bottom), 12px)', display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
@@ -1106,7 +1151,8 @@ function Nav({ tab, setTab, onAsk }) {
                 border: 'none',
                 background: active ? C.accent : 'transparent',
                 color: active ? '#fff' : C.sub,
-                borderRadius: 999, padding: '9px 18px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                borderRadius: 999, padding: '9px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                whiteSpace: 'nowrap',
               }}
             >
               {it.label}
@@ -1554,6 +1600,119 @@ function Library({ stateCode, onStateChange }) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+// ─── VAULT (account-gated, E2E-encrypted records; incident log first) ──────────
+// Incidents are CLOUD-ONLY: in memory while unlocked, encrypted rows at rest.
+// Nothing plaintext ever touches localStorage - this is the vault's whole point.
+const incidentSort = (list) =>
+  [...list].sort((a, b) => (b.at || '').localeCompare(a.at || '') || (b.createdAt || 0) - (a.createdAt || 0))
+
+const todayISO = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function IncidentSheet({ initial, onSave, onClose }) {
+  const t = useT()
+  const [at, setAt] = useState(initial?.at || todayISO())
+  const [what, setWhat] = useState(initial?.what || '')
+  const [where, setWhere] = useState(initial?.where || '')
+  const [who, setWho] = useState(initial?.who || '')
+  const [error, setError] = useState('')
+  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '12px 0 6px' }
+  return (
+    <Modal onClose={onClose} title={t(initial ? 'editIncident' : 'addIncident')}>
+      <label style={{ ...fieldLabel, marginTop: 0 }}>{t('incWhen')}</label>
+      <input type="date" value={at} onChange={(e) => setAt(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />
+      <label style={fieldLabel}>{t('incWhat')}</label>
+      <div>
+        {/* Textarea wrapped in a block div (iOS flex-item collapse). */}
+        <textarea
+          value={what} onChange={(e) => setWhat(e.target.value)} rows={4}
+          placeholder={t('incWhatPh')}
+          style={{ ...inputStyle, fontSize: 16, resize: 'none', lineHeight: 1.5 }}
+        />
+      </div>
+      <label style={fieldLabel}>{t('incWhere')}</label>
+      <input type="text" value={where} onChange={(e) => setWhere(e.target.value)} placeholder={t('incWherePh')} style={{ ...inputStyle, fontSize: 16 }} />
+      <label style={fieldLabel}>{t('incWho')}</label>
+      <input type="text" value={who} onChange={(e) => setWho(e.target.value)} placeholder={t('incWhoPh')} style={{ ...inputStyle, fontSize: 16 }} />
+      <CloudNote error={error} />
+      <button
+        onClick={() => {
+          if (!what.trim()) { setError(t('incNeedWhat')); return }
+          onSave({ ...(initial || {}), at: at || todayISO(), what: what.trim(), where: where.trim(), who: who.trim() })
+          onClose()
+        }}
+        style={{ ...cloudBtn('primary'), marginTop: 10 }}
+      >
+        {t('save')}
+      </button>
+      <button onClick={onClose} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('cancel')}</button>
+    </Modal>
+  )
+}
+
+function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, onOpenAccount }) {
+  const t = useT()
+  const [editing, setEditing] = useState(null) // null | 'new' | incident
+  const ready = cloud.status === 'ready'
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
+      <SectionTitle first>{t('incidentLog')}</SectionTitle>
+      {!ready ? (
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
+          <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('incidentSub')}</div>
+          <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
+          {incidents.length === 0 ? (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
+              {t('vaultEmptyList')}
+            </div>
+          ) : (
+            incidents.map((inc) => (
+              <SwipeableRow
+                key={inc.id}
+                onTap={() => setEditing(inc)}
+                actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDeleteIncident(inc.id) }]}
+              >
+                <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+                  <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.what}</div>
+                    <div style={{ fontSize: 12, color: C.sub, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {inc.at}{inc.where ? ` · ${inc.where}` : ''}{inc.who ? ` · ${inc.who}` : ''}
+                    </div>
+                  </div>
+                  {!IS_TOUCH && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteIncident(inc.id) }}
+                      aria-label={t('delete')}
+                      style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, background: 'transparent', border: 'none', borderLeft: `1px solid ${C.line}`, color: C.sub, cursor: 'pointer' }}
+                    >
+                      <IcTrash size={16} />
+                    </button>
+                  )}
+                </div>
+              </SwipeableRow>
+            ))
+          )}
+          <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
+        </>
+      )}
+      {editing && (
+        <IncidentSheet
+          initial={editing === 'new' ? null : editing}
+          onSave={onSaveIncident}
+          onClose={() => setEditing(null)}
+        />
+      )}
     </div>
   )
 }
