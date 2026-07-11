@@ -280,6 +280,14 @@ export default async function handler(req, res) {
       : `The person already received the ${content.name} answer shown in the conversation and wants to know how ${compareContent.name} compares. HandBook does NOT yet have ${compareContent.name}-specific content loaded. Say that plainly, explain that the federal HCBS baseline (the same floor as ${content.name}) applies in ${compareContent.name} too, and refer them to ${compareContent.name}'s Medicaid or developmental-disabilities agency and their local Protection and Advocacy office. Do not state ${compareContent.name} statutes, agency names, deadlines, or phone numbers. Keep it to one short paragraph.`
   }
 
+  // California has two distinct appeal systems that a smaller model tends to
+  // conflate (it grabs the 60-day regional-center number for everything). Give
+  // an explicit routing rule so IHSS/equipment/managed-care/EPSDT denials are
+  // sent to the correct CDSS track, not the regional-center track.
+  if (content.code === 'CA' && !compareContent) {
+    stateFraming += ` CALIFORNIA HAS TWO SEPARATE APPEAL SYSTEMS - do not mix them up. (1) If the REGIONAL CENTER denied the service (respite, day programs, supported living, and other services the regional center authorizes), it is the DDS/Lanterman appeal: 60-day deadline, cite WIC 4710.5. (2) If a MEDI-CAL service the regional center does NOT authorize was denied - in-home supportive services (IHSS), durable medical equipment such as wheelchairs, a Medi-Cal managed care plan decision, or EPSDT for someone under 21 - it is a DIFFERENT appeal through the Department of Social Services (CDSS) State Hearings: 90-day deadline, phone 1-800-743-8525. Never apply the 60-day regional-center deadline or WIC 4710.5 to IHSS, equipment, managed care, or EPSDT. If it is unclear which system applies, ask who authorized the service before giving a deadline.`
+  }
+
   // Team playbook: vetted answers that outrank the raw regs when they match.
   const guidance = matchPlaybook(lastUser + ' ' + (prevUser ? prevUser.content : ''), PLAYBOOK)
   const guidanceBlock = guidance.length
