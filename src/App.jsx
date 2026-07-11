@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FEDERAL, STATES, US_STATES } from '../api/_corpus.js'
 import { useCloud, mergeConversations } from './cloud.js'
@@ -182,6 +182,24 @@ const IcHistory = ({ size = 24, style }) => (
   <SvgIcon size={size} style={style}>
     <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
     <circle cx="3.5" cy="6" r="0.9" /><circle cx="3.5" cy="12" r="0.9" /><circle cx="3.5" cy="18" r="0.9" />
+  </SvgIcon>
+)
+// Home/program self-check tile.
+const IcHome = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" /><path d="M10 21v-6h4v6" />
+  </SvgIcon>
+)
+// Request-letters tile (envelope).
+const IcMail = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" />
+  </SvgIcon>
+)
+// Read-aloud control (speaker with a sound wave).
+const IcSpeaker = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M4 9v6h4l5 4V5L8 9H4z" /><path d="M16 8.5a4 4 0 0 1 0 7" />
   </SvgIcon>
 )
 
@@ -1479,6 +1497,42 @@ function CompareBlock({ compare, baseState, onCompare }) {
   )
 }
 
+// Speak an answer aloud with the browser's built-in text-to-speech (no network,
+// no cost). On-brand for readers with low vision, low literacy, or who simply
+// prefer listening. Hidden when the browser has no speech synthesis.
+const SPEECH_LANG = { en: 'en-US', es: 'es-ES', tl: 'fil-PH' }
+function ReadAloud({ text }) {
+  const t = useT()
+  const lang = useContext(LangContext)
+  const [speaking, setSpeaking] = useState(false)
+  const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
+  useEffect(() => () => { try { synth?.cancel() } catch { /* no-op */ } }, [synth])
+  if (!synth || !text) return null
+  const toggle = () => {
+    try {
+      if (speaking) { synth.cancel(); setSpeaking(false); return }
+      synth.cancel()
+      const u = new SpeechSynthesisUtterance(text)
+      u.lang = SPEECH_LANG[lang] || 'en-US'
+      u.rate = 0.95
+      u.onend = () => setSpeaking(false)
+      u.onerror = () => setSpeaking(false)
+      setSpeaking(true)
+      synth.speak(u)
+    } catch { setSpeaking(false) }
+  }
+  return (
+    <button
+      onClick={toggle}
+      aria-label={speaking ? t('stopReading') : t('readAloud')}
+      title={speaking ? t('stopReading') : t('readAloud')}
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 6, background: 'none', border: 'none', color: C.accent, cursor: 'pointer', padding: 2, fontSize: 12, fontWeight: 600, fontFamily: 'inherit' }}
+    >
+      <IcSpeaker size={15} />{speaking ? t('stopReading') : t('readAloud')}
+    </button>
+  )
+}
+
 const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref) {
   const user = m.role === 'user'
   return (
@@ -1499,6 +1553,7 @@ const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref
           {user ? <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span> : renderContent(m.content)}
         </div>
         {!user && <SourceChips sources={m.sources} />}
+        {!user && <ReadAloud text={m.content} />}
         {!user && onCompare && <CompareBlock compare={m.compare} baseState={baseState} onCompare={onCompare} />}
       </div>
     </div>
@@ -1872,6 +1927,116 @@ function openPacket(incidents, t, isCA) {
   return true
 }
 
+// Shared print-doc chrome for the self-check summary and the request letters
+// (same look as the complaint packet). Self-contained: these open as a Blob in
+// a new tab where no app CSS is available.
+const PRINT_CSS = `
+  :root { -webkit-text-size-adjust: 100%; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f3f1; color: #2b2a28; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .page { max-width: 720px; margin: 0 auto; padding: 28px 22px 60px; }
+  .bar { position: sticky; top: 0; background: #f4f3f1; padding: 12px 0; }
+  .print-btn { width: 100%; border: none; background: #2e7d74; color: #fff; font-size: 16px; font-weight: 700; padding: 14px; border-radius: 12px; cursor: pointer; }
+  h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; margin: 6px 0 2px; }
+  h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; margin: 22px 0 10px; }
+  .setting { font-size: 13px; color: #6e6a64; margin-bottom: 12px; }
+  .intro { font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
+  .inc { border: 1px solid #d9d5ce; border-radius: 10px; padding: 11px 13px; margin-bottom: 10px; background: #fff; }
+  .inc-what { font-size: 15px; font-weight: 700; line-height: 1.5; }
+  .inc-meta { font-size: 13px; color: #4a4843; margin-top: 5px; line-height: 1.5; }
+  .inc-meta .lbl { font-weight: 700; color: #2e7d74; }
+  .cite-sm { font-size: 11px; color: #8a857d; margin-top: 5px; }
+  .date { font-size: 14px; color: #4a4843; margin-bottom: 18px; }
+  .rline { font-size: 14px; line-height: 1.5; margin-bottom: 14px; white-space: pre-wrap; }
+  .salute { font-size: 14px; margin: 14px 0 10px; }
+  p { font-size: 14px; line-height: 1.65; margin: 0 0 12px; }
+  .sig { font-size: 14px; font-weight: 700; margin-top: 4px; }
+  .foot { font-size: 11px; color: #8a857d; margin-top: 26px; border-top: 1px solid #d9d5ce; padding-top: 10px; }
+  @media print { body { background: #fff; } .bar { display: none; } .page { max-width: none; padding: 0; } .inc { break-inside: avoid; } }
+`
+const openHtmlDoc = (html) => {
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+  const win = window.open(url, '_blank')
+  if (!win) { URL.revokeObjectURL(url); return false }
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+  return true
+}
+
+// ─── HOME / PROGRAM SELF-CHECK (federal HCBS Settings Rule, 42 CFR 441.301(c)(4)) ─
+// A plain-language check of everyday rights. `res: true` items are the extra
+// protections that apply in a provider-owned or provider-controlled home; they
+// are hidden when the person lives in their own or family home. Question / right
+// / ask-for text lives in i18n (hc_<id>_q / _r / _a) so it translates.
+const HOMECHECK_ITEMS = [
+  { id: 'community', cite: '42 CFR 441.301(c)(4)(i)', res: false },
+  { id: 'choice', cite: '42 CFR 441.301(c)(4)(ii)', res: false },
+  { id: 'privacy', cite: '42 CFR 441.301(c)(4)(iii)', res: false },
+  { id: 'schedule', cite: '42 CFR 441.301(c)(4)(iv)', res: false },
+  { id: 'money', cite: '42 CFR 441.301(c)(4)(i)', res: false },
+  { id: 'food', cite: '42 CFR 441.301(c)(4)(vi)(C)', res: true },
+  { id: 'visitors', cite: '42 CFR 441.301(c)(4)(vi)(D)', res: true },
+  { id: 'lock', cite: '42 CFR 441.301(c)(4)(vi)(B)', res: true },
+  { id: 'roommate', cite: '42 CFR 441.301(c)(4)(vi)(B)', res: true },
+  { id: 'decorate', cite: '42 CFR 441.301(c)(4)(vi)(B)', res: true },
+  { id: 'modified', cite: '42 CFR 441.301(c)(4)(vi)', res: false },
+]
+
+function buildHomeCheckHtml(flagged, setting, t) {
+  const rows = flagged.map((f) => `<div class="inc">
+    <div class="inc-what">${escapeHtml(t(`hc_${f.id}_q`))}</div>
+    <div class="inc-meta"><span class="lbl">${escapeHtml(t('hcYourRight'))}:</span> ${escapeHtml(t(`hc_${f.id}_r`))}</div>
+    <div class="inc-meta"><span class="lbl">${escapeHtml(t('hcAskFor'))}:</span> ${escapeHtml(t(`hc_${f.id}_a`))}</div>
+    <div class="cite-sm">${escapeHtml(f.cite)}</div>
+  </div>`).join('')
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(t('hcSummaryTitle'))}</title>
+<style>${PRINT_CSS}</style></head>
+<body><div class="page">
+  <div class="bar"><button class="print-btn" onclick="window.print()">${escapeHtml(t('packetPrint'))}</button></div>
+  <h1>${escapeHtml(t('hcSummaryTitle'))}</h1>
+  <div class="setting">${escapeHtml(t(setting === 'provider' ? 'hcSettingLabelProvider' : 'hcSettingLabelHome'))}</div>
+  <p class="intro">${escapeHtml(t('hcSummaryIntro'))}</p>
+  <h2>${escapeHtml(t('hcAreasToReview'))}</h2>
+  ${rows}
+  <h2>${escapeHtml(t('hcNextTitle'))}</h2>
+  <p>${escapeHtml(t('hcNext'))}</p>
+  <div class="foot">${escapeHtml(t('packetFooter'))}</div>
+</div></body></html>`
+}
+const openHomeCheck = (flagged, setting, t) => openHtmlDoc(buildHomeCheckHtml(flagged, setting, t))
+
+// ─── REQUEST LETTERS ──────────────────────────────────────────────────────────
+// Ready-to-print letters for common, low-stakes requests (lighter cousins of the
+// complaint packet). Title + body live in i18n (lt_<id>_title / lt_<id>_body);
+// the body holds paragraphs separated by a blank line.
+const LETTER_TEMPLATES = [{ id: 'ipp' }, { id: 'records' }, { id: 'noa' }, { id: 'review' }, { id: 'interpreter' }]
+
+function buildLetterHtml(tplId, fields, t) {
+  const title = t(`lt_${tplId}_title`)
+  const bodyParas = t(`lt_${tplId}_body`).split('\n\n').map((p) => `<p>${escapeHtml(p)}</p>`).join('')
+  const detail = fields.details ? `<p>${escapeHtml(fields.details)}</p>` : ''
+  const name = escapeHtml(fields.name || t('ltNamePlaceholder'))
+  const recipient = escapeHtml(fields.recipient || t('ltRecipientPlaceholder'))
+  const dateStr = escapeHtml(isoToLocale(todayISO()))
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>${PRINT_CSS}</style></head>
+<body><div class="page">
+  <div class="bar"><button class="print-btn" onclick="window.print()">${escapeHtml(t('packetPrint'))}</button></div>
+  <div class="date">${dateStr}</div>
+  <div class="rline">${recipient}</div>
+  <p class="salute">${escapeHtml(t('ltSalutation'))}</p>
+  ${bodyParas}
+  ${detail}
+  <p class="salute">${escapeHtml(t('ltClosing'))}</p>
+  <div class="sig">${name}</div>
+  <div class="foot">${escapeHtml(t('packetFooter'))}</div>
+</div></body></html>`
+}
+const openLetter = (tplId, fields, t) => openHtmlDoc(buildLetterHtml(tplId, fields, t))
+
 // ─── VAULT DOCUMENTS & PHOTOS (E2E; file bytes in the private storage bucket) ──
 const MAX_DOC_BYTES = 25 * 1024 * 1024 // matches the bucket's file_size_limit
 const docSort = (list) => [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
@@ -2148,6 +2313,145 @@ function DeadlineSheet({ initial, onSave, onClose, isCA }) {
   )
 }
 
+// Guided self-check of everyday HCBS rights. Purely local (nothing saved unless
+// the person chooses to): answer the questions, then see which rights may need a
+// closer look, with a printable summary and a one-tap "save to incident log".
+function HomeCheckSheet({ onClose, onSaveIncident }) {
+  const t = useT()
+  const [setting, setSetting] = useState('provider')
+  const [answers, setAnswers] = useState({})
+  const [showResults, setShowResults] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState('')
+  const items = HOMECHECK_ITEMS.filter((it) => !it.res || setting === 'provider')
+  const flagged = items.filter((it) => answers[it.id] === 'no' || answers[it.id] === 'unsure')
+  const answered = items.some((it) => answers[it.id])
+  const settingOptions = [
+    { value: 'provider', label: t('hcSettingProvider') },
+    { value: 'home', label: t('hcSettingHome') },
+  ]
+
+  const choiceRow = (id) => (
+    <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+      {['yes', 'no', 'unsure'].map((v) => {
+        const active = answers[id] === v
+        const col = v === 'yes' ? C.accent : v === 'no' ? C.danger : C.sub
+        const bg = !active ? C.card : v === 'yes' ? C.accentSoft : v === 'no' ? '#F7E4DF' : C.bg
+        return (
+          <button
+            key={v} onClick={() => setAnswers((a) => ({ ...a, [id]: v }))} aria-pressed={active}
+            style={{ flex: 1, padding: '9px 6px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${active ? col : C.border}`, background: bg, color: active ? col : C.sub }}
+          >
+            {t(v === 'yes' ? 'hcYes' : v === 'no' ? 'hcNo' : 'hcUnsure')}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  const saveToLog = () => {
+    setErr('')
+    const body = t('hcIncidentIntro') + '\n\n' + flagged.map((f) => '- ' + t(`hc_${f.id}_q`)).join('\n')
+    onSaveIncident({ at: todayISO(), what: body, where: '', who: '' })
+    setSaved(true)
+  }
+  const openSummary = () => { setErr(''); if (!openHomeCheck(flagged, setting, t)) setErr(t('packetOpenFailed')) }
+
+  if (showResults) {
+    return (
+      <Modal onClose={onClose} title={t('homeCheck')}>
+        {flagged.length === 0 ? (
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.ink, lineHeight: 1.55 }}>{t('hcResultsNone')}</div>
+        ) : (
+          <>
+            <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.55, marginBottom: 14 }}>{t('hcResultsIntro', { n: flagged.length })}</div>
+            {flagged.map((f) => (
+              <div key={f.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 10, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, lineHeight: 1.4 }}>{t(`hc_${f.id}_q`)}</div>
+                <div style={{ fontSize: 13, color: C.sub, marginTop: 7, lineHeight: 1.5 }}><span style={{ fontWeight: 700, color: C.accent }}>{t('hcYourRight')}:</span> {t(`hc_${f.id}_r`)}</div>
+                <div style={{ fontSize: 13, color: C.sub, marginTop: 5, lineHeight: 1.5 }}><span style={{ fontWeight: 700, color: C.accent }}>{t('hcAskFor')}:</span> {t(`hc_${f.id}_a`)}</div>
+                <div style={{ fontSize: 11, color: C.ink3, marginTop: 6 }}>{f.cite}</div>
+              </div>
+            ))}
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, margin: '14px 0' }}>{t('hcNext')}</div>
+            <button onClick={openSummary} style={cloudBtn('primary')}>{t('hcOpenSummary')}</button>
+            <button onClick={saveToLog} disabled={saved} style={{ ...cloudBtn('secondary'), marginTop: 8, opacity: saved ? 0.6 : 1 }}>{saved ? t('hcSaved') : t('hcSaveIncident')}</button>
+            <CloudNote error={err} />
+          </>
+        )}
+        <button onClick={() => { setShowResults(false); setSaved(false) }} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('hcBack')}</button>
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal onClose={onClose} title={t('homeCheck')}>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>{t('hcIntro')}</div>
+      <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>{t('hcSetting')}</label>
+      <Select value={setting} onChange={setSetting} options={settingOptions} ariaLabel={t('hcSetting')} />
+      <div style={{ marginTop: 16 }}>
+        {items.map((it) => (
+          <div key={it.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 10, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+            <div style={{ fontSize: 15, color: C.ink, lineHeight: 1.4 }}>{t(`hc_${it.id}_q`)}</div>
+            {choiceRow(it.id)}
+          </div>
+        ))}
+      </div>
+      <button onClick={() => setShowResults(true)} disabled={!answered} style={{ ...cloudBtn('primary'), marginTop: 4, opacity: answered ? 1 : 0.5 }}>{t('hcSeeResults')}</button>
+    </Modal>
+  )
+}
+
+// Pick a common request, add a couple of details, and open a ready-to-print
+// letter. Stateless: it just builds a printable page (no vault storage needed).
+function LettersSheet({ onClose }) {
+  const t = useT()
+  const [picked, setPicked] = useState(null)
+  const [name, setName] = useState('')
+  const [recipient, setRecipient] = useState('')
+  const [details, setDetails] = useState('')
+  const [err, setErr] = useState('')
+  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '12px 0 6px' }
+
+  if (!picked) {
+    return (
+      <Modal onClose={onClose} title={t('letters')}>
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>{t('ltIntro')}</div>
+        {LETTER_TEMPLATES.map((tpl) => (
+          <button
+            key={tpl.id} onClick={() => setPicked(tpl.id)}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px', marginBottom: 10, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}
+          >
+            <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>{t(`lt_${tpl.id}_title`)}</span>
+            <IcChevron dir="right" size={18} style={{ color: C.ink3, flexShrink: 0 }} />
+          </button>
+        ))}
+      </Modal>
+    )
+  }
+
+  const make = () => {
+    setErr('')
+    if (!openLetter(picked, { name: name.trim(), recipient: recipient.trim(), details: details.trim() }, t)) setErr(t('packetOpenFailed'))
+  }
+  return (
+    <Modal onClose={() => setPicked(null)} title={t(`lt_${picked}_title`)}>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 4 }}>{t(`lt_${picked}_body`).split('\n\n')[0]}</div>
+      <label style={fieldLabel}>{t('ltName')}</label>
+      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('ltNamePlaceholder')} style={{ ...inputStyle, fontSize: 16 }} />
+      <label style={fieldLabel}>{t('ltRecipient')}</label>
+      <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder={t('ltRecipientPlaceholder')} style={{ ...inputStyle, fontSize: 16 }} />
+      <label style={fieldLabel}>{t('ltDetails')}</label>
+      <div>
+        <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} placeholder={t('ltDetailsPh')} style={{ ...inputStyle, fontSize: 16, resize: 'none', lineHeight: 1.5 }} />
+      </div>
+      <button onClick={make} style={{ ...cloudBtn('primary'), marginTop: 12 }}>{t('ltOpen')}</button>
+      <CloudNote error={err} />
+      <button onClick={() => setPicked(null)} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('ltBack')}</button>
+    </Modal>
+  )
+}
+
 function ContactsCard({ isCA }) {
   const t = useT()
   // CA gets its verified agency lines; every other state gets only what is true
@@ -2208,7 +2512,7 @@ function VaultTile({ icon, label, sub, onClick }) {
 // tiles → closed), so navigation is all "pull down", no back buttons.
 function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
   const t = useT()
-  const [tool, setTool] = useState(null) // null(tiles) | incidents | deadlines | documents | packet | contacts
+  const [tool, setTool] = useState(null) // null(tiles) | incidents | deadlines | homecheck | letters | documents | packet | contacts
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const [packetError, setPacketError] = useState('')
@@ -2319,6 +2623,8 @@ function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteInciden
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setTool('incidents')} />
               <VaultTile icon={<IcClock size={22} />} label={t('appealDeadlines')} sub={countText(deadlines.length)} onClick={() => setTool('deadlines')} />
+              <VaultTile icon={<IcHome size={22} />} label={t('homeCheck')} sub={t('hcTileSub')} onClick={() => setTool('homecheck')} />
+              <VaultTile icon={<IcMail size={22} />} label={t('letters')} sub={t('ltTileSub')} onClick={() => setTool('letters')} />
               <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setTool('documents')} />
               <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setTool('packet')} />
               <VaultTile icon={<IcPhone size={22} />} label={t('helpContacts')} sub={t('tileContactsSub')} onClick={() => setTool('contacts')} />
@@ -2375,6 +2681,14 @@ function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteInciden
         )}
       </Modal>
     )
+  }
+
+  if (tool === 'homecheck') {
+    return <HomeCheckSheet onClose={backToTiles} onSaveIncident={onSaveIncident} />
+  }
+
+  if (tool === 'letters') {
+    return <LettersSheet onClose={backToTiles} />
   }
 
   // contacts

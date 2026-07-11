@@ -41,6 +41,16 @@
       }
       ::selection { background: rgba(46,125,116,0.22); }
       @keyframes hb-spin { to { transform: rotate(360deg); } }
+      /* Honor the OS "Reduce Motion" setting: drop spinners, slides, and
+         transitions for users who get motion sick or find them distracting. */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+          scroll-behavior: auto !important;
+        }
+      }
     </style>
   </head>
   <body>
