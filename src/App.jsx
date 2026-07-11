@@ -259,6 +259,10 @@ function useGlobalFieldRecenter() {
     const recenter = (smooth = true) => {
       const el = document.activeElement
       if (isNativePicker(el)) return
+      // Modal sheets track the visual viewport themselves and let the browser's
+      // native focus-scroll keep the field in view; the page recenter here would
+      // fight that and yank the field to the top. Skip fields inside a sheet.
+      if (el?.closest?.('[data-sheet-scroll]')) return
       resetScroll()
       if (!isField(el)) return
       const vv = window.visualViewport
@@ -431,7 +435,8 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', styl
 
 // ─── MODAL (ported from GuestBook): bottom sheet on touch (grab handle +
 // drag-down-to-dismiss via NATIVE non-passive listeners), centered floating
-// dialog on desktop. Lifts above the keyboard via marginBottom:kbInset.
+// dialog on desktop. Clears the keyboard by sizing the overlay to the visual
+// viewport (touch) so the bottom-anchored sheet sits right above the keyboard.
 function Modal({ onClose, children, title, width = 480 }) {
   useEscToClose(onClose)
   const sheetRef = useRef(null)
@@ -441,16 +446,16 @@ function Modal({ onClose, children, title, width = 480 }) {
 
   const kbInset = useKeyboardInset()
 
-  // iOS (worst in the home-screen PWA) pans the VISUAL viewport down when a
-  // focused field would sit behind the keyboard. Fixed overlays live in the
-  // LAYOUT viewport, so that pan shoves the whole sheet up off-screen - on top
-  // of the sheet's own kbInset lift. Pin the overlay to the visual viewport by
-  // shifting it down by exactly the pan amount.
-  const [vvTop, setVvTop] = useState(0)
+  // Pin the overlay to the VISUAL viewport (touch only). When the keyboard opens
+  // iOS shrinks the visual viewport to the area above it; sizing the fixed
+  // overlay to that rect makes the bottom-anchored sheet sit right above the
+  // keyboard on its own - no kbInset margin, no per-field scrolling, no fight
+  // with the page's global recenter (which we also opt this sheet out of).
+  const [vvRect, setVvRect] = useState(null)
   useEffect(() => {
     const vv = window.visualViewport
-    if (!vv) return
-    const on = () => setVvTop(vv.offsetTop || 0)
+    if (!vv || !IS_TOUCH) return
+    const on = () => setVvRect({ top: vv.offsetTop || 0, left: vv.offsetLeft || 0, width: vv.width, height: vv.height })
     vv.addEventListener('resize', on)
     vv.addEventListener('scroll', on)
     on()
@@ -567,8 +572,12 @@ function Modal({ onClose, children, title, width = 480 }) {
       onTouchMove={(e) => e.stopPropagation()}
       onTouchEnd={(e) => e.stopPropagation()}
       style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        transform: vvTop ? `translateY(${vvTop}px)` : 'none',
+        position: 'fixed', zIndex: 1000,
+        // Touch: track the visual viewport so the sheet clears the keyboard.
+        // Desktop / pre-measure: cover the whole layout viewport.
+        ...(vvRect
+          ? { top: vvRect.top, left: vvRect.left, width: vvRect.width, height: vvRect.height }
+          : { inset: 0 }),
         background: 'rgba(43,42,40,0.45)',
         // Touch: thumb-reachable bottom sheet. Desktop: centered floating dialog.
         display: 'flex', alignItems: IS_TOUCH ? 'flex-end' : 'center',
@@ -583,9 +592,10 @@ function Modal({ onClose, children, title, width = 480 }) {
           background: C.surface, borderRadius: IS_TOUCH ? '20px 20px 0 0' : 20,
           paddingTop: IS_TOUCH ? 8 : 24,
           paddingBottom: 'calc(24px + env(safe-area-inset-bottom))',
-          marginBottom: kbInset, transition: 'margin-bottom 0.2s ease',
           display: 'flex', flexDirection: 'column',
-          maxHeight: kbInset ? `calc(90vh - ${kbInset}px)` : '90vh',
+          // The overlay is already the visible area (above the keyboard), so a
+          // simple share of it keeps the sheet on-screen without kbInset math.
+          maxHeight: IS_TOUCH ? '94%' : '90vh',
           boxShadow: '0 -8px 40px rgba(43,42,40,0.18)',
         }}
       >
@@ -600,9 +610,8 @@ function Modal({ onClose, children, title, width = 480 }) {
             )}
           </div>
         )}
-        <div ref={innerRef} style={{ flex: '0 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingLeft: 20, paddingRight: 20 }}>
+        <div ref={innerRef} data-sheet-scroll style={{ flex: '0 1 auto', minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingLeft: 20, paddingRight: 20 }}>
           {children}
-          <div style={{ height: kbInset, flexShrink: 0 }} />
         </div>
       </div>
     </div>,
