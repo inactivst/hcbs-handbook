@@ -1126,7 +1126,7 @@ export default function App() {
           connected={cloud.status === 'ready'}
         />
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
-        {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} />}
+        {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} onSaveIncident={cloud.status === 'ready' ? incidents.save : undefined} />}
       </div>
       {/* Bottom fade: content dissolves into the background before it reaches the
           floating nav, so cards never blend into the glass pill. */}
@@ -1696,13 +1696,27 @@ function StatePack({ code, compact = false }) {
   )
 }
 
-function Library({ stateCode, onStateChange }) {
+function Library({ stateCode, onStateChange, onSaveIncident }) {
   const t = useT()
   const [openState, setOpenState] = useState(null)
+  const [showCheck, setShowCheck] = useState(false)
   const covered = stateCovered(stateCode)
   const otherStates = STATE_OPTIONS.filter((o) => o.value !== stateCode)
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `16px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
+      {/* Featured public tool: the home/program self-check (no account needed). */}
+      <button
+        onClick={() => setShowCheck(true)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: C.accentSoft, border: `1px solid ${C.accent}33`, borderRadius: 16, padding: 14, marginBottom: 18, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}
+      >
+        <span style={{ width: 42, height: 42, borderRadius: 12, background: C.card, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcHome size={22} /></span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 16, fontWeight: 700, color: C.ink }}>{t('homeCheck')}</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 1.4 }}>{t('hcRightsSub')}</span>
+        </span>
+        <IcChevron dir="right" size={18} style={{ color: C.accent, flexShrink: 0 }} />
+      </button>
+      {showCheck && <HomeCheckSheet onClose={() => setShowCheck(false)} onSaveIncident={onSaveIncident} />}
       <SectionTitle first>{t('yourState')}</SectionTitle>
       <div style={{ marginBottom: 10 }}>
         <Select value={stateCode} onChange={onStateChange} options={STATE_OPTIONS} ariaLabel={t('yourState')} />
@@ -2375,7 +2389,9 @@ function HomeCheckSheet({ onClose, onSaveIncident }) {
             ))}
             <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, margin: '14px 0' }}>{t('hcNext')}</div>
             <button onClick={openSummary} style={cloudBtn('primary')}>{t('hcOpenSummary')}</button>
-            <button onClick={saveToLog} disabled={saved} style={{ ...cloudBtn('secondary'), marginTop: 8, opacity: saved ? 0.6 : 1 }}>{saved ? t('hcSaved') : t('hcSaveIncident')}</button>
+            {onSaveIncident && (
+              <button onClick={saveToLog} disabled={saved} style={{ ...cloudBtn('secondary'), marginTop: 8, opacity: saved ? 0.6 : 1 }}>{saved ? t('hcSaved') : t('hcSaveIncident')}</button>
+            )}
             <CloudNote error={err} />
           </>
         )}
@@ -2512,7 +2528,7 @@ function VaultTile({ icon, label, sub, onClick }) {
 // tiles → closed), so navigation is all "pull down", no back buttons.
 function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
   const t = useT()
-  const [tool, setTool] = useState(null) // null(tiles) | incidents | deadlines | homecheck | letters | documents | packet | contacts
+  const [tool, setTool] = useState(null) // null(tiles) | incidents | deadlines | letters | documents | packet | contacts
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const [packetError, setPacketError] = useState('')
@@ -2623,7 +2639,6 @@ function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteInciden
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setTool('incidents')} />
               <VaultTile icon={<IcClock size={22} />} label={t('appealDeadlines')} sub={countText(deadlines.length)} onClick={() => setTool('deadlines')} />
-              <VaultTile icon={<IcHome size={22} />} label={t('homeCheck')} sub={t('hcTileSub')} onClick={() => setTool('homecheck')} />
               <VaultTile icon={<IcMail size={22} />} label={t('letters')} sub={t('ltTileSub')} onClick={() => setTool('letters')} />
               <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setTool('documents')} />
               <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setTool('packet')} />
@@ -2681,10 +2696,6 @@ function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteInciden
         )}
       </Modal>
     )
-  }
-
-  if (tool === 'homecheck') {
-    return <HomeCheckSheet onClose={backToTiles} onSaveIncident={onSaveIncident} />
   }
 
   if (tool === 'letters') {
@@ -2830,6 +2841,16 @@ function CloudSheet({ onClose, cloud }) {
   const [emailInput, setEmailInput] = useState(email || '')
   const [code, setCode] = useState('')
   const [pin, setPin] = useState('')
+
+  // When entering the PIN (or finishing setup) unlocks the vault, drop the user
+  // straight back to the app instead of leaving this sheet open on the "ready"
+  // screen. Fires only on the transition INTO 'ready', so opening the sheet while
+  // already signed in still shows the Lock / Sign out / auto-lock controls.
+  const prevStatusRef = useRef(status)
+  useEffect(() => {
+    if (status === 'ready' && prevStatusRef.current !== 'ready') onClose()
+    prevStatusRef.current = status
+  }, [status, onClose])
 
   // Render a translated string containing {email} with the address bolded.
   const withEmail = (key) => {

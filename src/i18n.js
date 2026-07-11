@@ -223,6 +223,7 @@ const STRINGS = {
     // Home / program self-check (federal HCBS Settings Rule)
     homeCheck: 'Check my home or program',
     hcTileSub: 'Check your rights',
+    hcRightsSub: 'Answer a few questions to see which of your rights may need a closer look.',
     hcIntro: 'A quick check of your everyday rights under the federal HCBS rules. Answer what you can - nothing is saved unless you choose to save it.',
     hcSetting: 'Where do you get your services?',
     hcSettingProvider: 'A group home or provider-run home',
@@ -509,6 +510,7 @@ const STRINGS = {
     // Autoevaluación del hogar / programa
     homeCheck: 'Revisar mi hogar o programa',
     hcTileSub: 'Revisa tus derechos',
+    hcRightsSub: 'Responde unas preguntas para ver cuáles de tus derechos podrían necesitar una mirada más de cerca.',
     hcIntro: 'Una revisión rápida de tus derechos cotidianos según las reglas federales de HCBS. Responde lo que puedas; no se guarda nada a menos que tú lo decidas.',
     hcSetting: '¿Dónde recibes tus servicios?',
     hcSettingProvider: 'Un hogar grupal o un hogar operado por un proveedor',
@@ -795,6 +797,7 @@ const STRINGS = {
     // Pagsusuri sa tahanan / programa
     homeCheck: 'Suriin ang aking tahanan o programa',
     hcTileSub: 'Suriin ang iyong karapatan',
+    hcRightsSub: 'Sagutin ang ilang tanong para makita kung alin sa iyong mga karapatan ang maaaring kailangang tingnang mabuti.',
     hcIntro: 'Mabilis na pagsusuri ng iyong pang-araw-araw na karapatan sa ilalim ng federal na patakaran ng HCBS. Sagutin ang kaya mo; walang maiimbak maliban kung piliin mong i-save.',
     hcSetting: 'Saan mo natatanggap ang iyong mga serbisyo?',
     hcSettingProvider: 'Isang group home o tahanang pinapatakbo ng provider',
