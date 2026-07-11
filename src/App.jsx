@@ -1026,6 +1026,7 @@ export default function App() {
             onSaveDeadline={deadlines.save}
             onDeleteDeadline={deadlines.remove}
             onOpenAccount={() => setShowCloud(true)}
+            isCA={(stateCode || 'CA') === 'CA'}
           />
         )}
       </div>
@@ -1659,6 +1660,91 @@ const CONTACTS = [
   { name: 'NDRN', descKey: 'cNdrn', url: 'ndrn.org' },
 ]
 
+// Escape user-entered incident text before it goes into the packet HTML so a
+// stray "<" can never break (or inject into) the printable document.
+const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+
+// Build a self-contained, print-ready HTML document from the incident log. The
+// packet is the whole point of keeping incidents: a dated, formatted complaint
+// the person can save as a PDF and file. CA gets the WIC 4731 framing; other
+// states get a generic concerns record (never guess another state's process).
+function buildPacketHtml(incidents, t, isCA) {
+  const title = t(isCA ? 'packetDocTitle' : 'packetDocTitleGeneric')
+  const intro = t(isCA ? 'packetIntroCA' : 'packetIntroGeneric')
+  const fileBody = t(isCA ? 'packetFileCA' : 'packetFileGeneric')
+  const blank = '<span class="blank"></span>'
+  const field = (label) => `<div class="field"><span class="flabel">${escapeHtml(label)}:</span>${blank}</div>`
+  const rows = incidents.map((inc) => {
+    const meta = [inc.where && `${escapeHtml(t('incWhere'))}: ${escapeHtml(inc.where)}`,
+      inc.who && `${escapeHtml(t('incWho'))}: ${escapeHtml(inc.who)}`].filter(Boolean).join(' · ')
+    return `<div class="inc">
+      <div class="inc-date">${escapeHtml(inc.at || '')}</div>
+      <div class="inc-what">${escapeHtml(inc.what || '')}</div>
+      ${meta ? `<div class="inc-meta">${meta}</div>` : ''}
+    </div>`
+  }).join('')
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>
+  :root { -webkit-text-size-adjust: 100%; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f3f1; color: #2b2a28; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .page { max-width: 720px; margin: 0 auto; padding: 28px 22px 60px; }
+  .bar { position: sticky; top: 0; background: #f4f3f1; padding: 12px 0; }
+  .print-btn { width: 100%; border: none; background: #2e7d74; color: #fff; font-size: 16px; font-weight: 700; padding: 14px; border-radius: 12px; cursor: pointer; }
+  h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; margin: 6px 0 2px; }
+  .cite { font-size: 13px; color: #6e6a64; margin-bottom: 16px; }
+  .intro { font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
+  h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; margin: 22px 0 10px; }
+  .field { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; font-size: 14px; }
+  .flabel { color: #6e6a64; white-space: nowrap; }
+  .blank { flex: 1; border-bottom: 1px solid #b3aea6; min-height: 18px; }
+  .inc { border: 1px solid #d9d5ce; border-radius: 10px; padding: 11px 13px; margin-bottom: 10px; background: #fff; }
+  .inc-date { font-size: 12px; font-weight: 700; color: #2e7d74; }
+  .inc-what { font-size: 14px; line-height: 1.5; margin-top: 3px; white-space: pre-wrap; }
+  .inc-meta { font-size: 12px; color: #6e6a64; margin-top: 4px; }
+  .file { font-size: 14px; line-height: 1.6; }
+  .foot { font-size: 11px; color: #8a857d; margin-top: 26px; border-top: 1px solid #d9d5ce; padding-top: 10px; }
+  @media print {
+    body { background: #fff; }
+    .bar { display: none; }
+    .page { max-width: none; padding: 0; }
+    .inc { break-inside: avoid; }
+  }
+</style></head>
+<body><div class="page">
+  <div class="bar"><button class="print-btn" onclick="window.print()">${escapeHtml(t('packetPrint'))}</button></div>
+  <h1>${escapeHtml(title)}</h1>
+  ${isCA ? `<div class="cite">${escapeHtml(t('packetCitation'))}</div>` : ''}
+  ${field(t('packetFieldName'))}
+  ${isCA ? field(t('packetFieldId')) : ''}
+  ${field(t('packetFieldRC'))}
+  ${field(t('packetFieldPhone'))}
+  ${field(t('packetFieldDate'))}
+  <p class="intro">${escapeHtml(intro)}</p>
+  <h2>${escapeHtml(t('packetWhatHappened'))}</h2>
+  ${rows}
+  <h2>${escapeHtml(t('packetHowToFile'))}</h2>
+  <p class="file">${escapeHtml(fileBody)}</p>
+  <div class="foot">${escapeHtml(t('packetFooter'))}</div>
+</div></body></html>`
+}
+
+// Open the packet in a new tab via a Blob URL (no network - the PHI never
+// leaves the device). The tab has its own "Save as PDF" button; on iOS that
+// routes through the share sheet. Blob URLs open cleanly even from a
+// standalone PWA, where document.write into a blank window is flaky.
+function openPacket(incidents, t, isCA) {
+  const html = buildPacketHtml(incidents, t, isCA)
+  const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
+  const win = window.open(url, '_blank')
+  if (!win) { URL.revokeObjectURL(url); return false }
+  setTimeout(() => URL.revokeObjectURL(url), 60000)
+  return true
+}
+
 function IncidentSheet({ initial, onSave, onClose }) {
   const t = useT()
   const [at, setAt] = useState(initial?.at || todayISO())
@@ -1778,11 +1864,17 @@ function ContactsCard() {
   )
 }
 
-function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, onOpenAccount }) {
+function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, onOpenAccount, isCA }) {
   const t = useT()
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
+  const [packetError, setPacketError] = useState('')
   const ready = cloud.status === 'ready'
+
+  const makePacket = () => {
+    setPacketError('')
+    if (!openPacket(incidents, t, isCA)) setPacketError(t('packetOpenFailed'))
+  }
 
   const deadlineRow = (rec) => {
     const due = addDaysISO(rec.notice, deadlineDays(rec))
@@ -1865,6 +1957,19 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
               </SwipeableRow>
             ))
           )}
+          <SectionTitle>{t('packet')}</SectionTitle>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('packetSub')}</div>
+          {incidents.length === 0 ? (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
+              {t('packetNeedIncident')}
+            </div>
+          ) : (
+            <>
+              <button onClick={makePacket} style={cloudBtn('primary')}>{t('createPacket')}</button>
+              <CloudNote error={packetError} />
+            </>
+          )}
+
           <SectionTitle>{t('appealDeadlines')}</SectionTitle>
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
           <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
