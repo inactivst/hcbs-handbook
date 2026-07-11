@@ -1692,7 +1692,7 @@ function CloudSheet({ onClose, cloud }) {
           />
           <CloudNote error={error} />
           <button disabled={busy} onClick={() => cloud.sendCode(emailInput)} style={{ ...cloudBtn('primary'), marginTop: 12, opacity: busy ? 0.6 : 1 }}>
-            {busy ? 'Sending…' : 'Email me a code'}
+            {busy ? 'Sending…' : 'Email me a sign-in link'}
           </button>
         </div>
       )}
@@ -1700,9 +1700,10 @@ function CloudSheet({ onClose, cloud }) {
       {status === 'code_sent' && (
         <div>
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 16 }}>
-            We sent a 6-digit code to <strong>{email}</strong>. Enter it below.
+            We emailed <strong>{email}</strong>. Tap the sign-in link in that email on this
+            device, then come back here. If your email shows a 6-digit code instead, enter it below.
           </div>
-          <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>Code</label>
+          <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>Code (only if your email has one)</label>
           <input
             type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="123456" maxLength={6}
             value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}

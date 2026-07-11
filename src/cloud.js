@@ -43,7 +43,19 @@ export function useCloud() {
       setEmail(user.email || localEmail.get())
       await routeAfterAuth(user)
     })()
-    return () => { alive = false }
+    // The sign-in email carries a LINK (Supabase locks the code template behind
+    // custom SMTP). The link may complete auth in this tab (detectSessionInUrl)
+    // or another tab of the same browser; either way this listener moves an
+    // awaiting-code sheet forward to the PIN step.
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      const user = session?.user
+      if (event === 'SIGNED_IN' && user && !userRef.current) {
+        userRef.current = user
+        setEmail(user.email || localEmail.get())
+        routeAfterAuth(user)
+      }
+    })
+    return () => { alive = false; sub?.subscription?.unsubscribe() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
