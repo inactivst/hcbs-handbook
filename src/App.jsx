@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { FEDERAL, STATES, US_STATES } from '../api/_corpus.js'
 import { useCloud, mergeConversations } from './cloud.js'
 import { LANG_OPTIONS, LangContext, getStoredLang, storeLang, useT, tr } from './i18n.js'
+import { CENTERS, COUNTY_TO_RC, LA_CENTERS, COUNTIES, siblingCounties, CA_MAP, DDS_LOOKUP_URL } from './regionalCenters.js'
 
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
@@ -933,7 +934,6 @@ export default function App() {
   const [error, setError] = useState('')
   const [showSettings, setShowSettings] = useState(false)
   const [showCloud, setShowCloud] = useState(false)
-  const [showVault, setShowVault] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   // '' = never chosen -> first-launch prompt asks. Chosen state grounds every
   // answer (sent with each question) and drives the Rights page split.
@@ -1127,27 +1127,26 @@ export default function App() {
         />
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} onSaveIncident={cloud.status === 'ready' ? incidents.save : undefined} />}
+        {tab === 'vault' && (
+          <VaultPage
+            cloud={cloud}
+            incidents={incidents.items}
+            onSaveIncident={incidents.save}
+            onDeleteIncident={incidents.remove}
+            deadlines={deadlines.items}
+            onSaveDeadline={deadlines.save}
+            onDeleteDeadline={deadlines.remove}
+            vaultDocs={vaultDocs}
+            onOpenAccount={() => setShowCloud(true)}
+            isCA={(stateCode || 'CA') === 'CA'}
+          />
+        )}
       </div>
       {/* Bottom fade: content dissolves into the background before it reaches the
           floating nav, so cards never blend into the glass pill. */}
       <div style={{ position: 'fixed', left: 0, right: 0, bottom: 0, height: 'calc(env(safe-area-inset-bottom) + 104px)', background: `linear-gradient(to top, ${C.bg} 42%, ${C.bg}D9 66%, ${C.bg}00)`, pointerEvents: 'none', zIndex: 40 }} />
-      <Nav tab={tab} onAsk={startNew} onLibrary={() => setTab('library')} onVault={() => setShowVault(true)} />
+      <Nav tab={tab} onAsk={startNew} onLibrary={() => setTab('library')} onVault={() => setTab('vault')} />
       {!stateCode && <StatePrompt onChoose={chooseState} />}
-      {showVault && (
-        <VaultSheet
-          onClose={() => setShowVault(false)}
-          cloud={cloud}
-          incidents={incidents.items}
-          onSaveIncident={incidents.save}
-          onDeleteIncident={incidents.remove}
-          deadlines={deadlines.items}
-          onSaveDeadline={deadlines.save}
-          onDeleteDeadline={deadlines.remove}
-          vaultDocs={vaultDocs}
-          onOpenAccount={() => { setShowVault(false); setShowCloud(true) }}
-          isCA={(stateCode || 'CA') === 'CA'}
-        />
-      )}
       {showHistory && (
         <HistorySheet
           onClose={() => setShowHistory(false)}
@@ -1245,12 +1244,16 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
         }}
       >
         {pill(t('navAsk'), tab === 'chat', onAsk)}
-        {/* Raised center Vault button (GuestBook Tools pattern) */}
-        <button onClick={onVault} aria-label={t('navVault')} style={{
+        {/* Raised center Vault button (GuestBook Tools pattern). Now a real tab -
+            an accent ring marks it active, matching the pills' selected state. */}
+        <button onClick={onVault} aria-label={t('navVault')} aria-current={tab === 'vault' ? 'page' : undefined} style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1,
           width: 60, height: 60, marginTop: -22, borderRadius: '50%', flexShrink: 0,
-          background: C.accent, color: '#fff', border: '3px solid rgba(255,255,255,0.9)', cursor: 'pointer',
-          boxShadow: '0 6px 18px rgba(46,125,116,0.4)',
+          background: C.accent, color: '#fff',
+          border: tab === 'vault' ? '3px solid #fff' : '3px solid rgba(255,255,255,0.9)', cursor: 'pointer',
+          boxShadow: tab === 'vault'
+            ? `0 0 0 2px ${C.accent}, 0 6px 18px rgba(46,125,116,0.5)`
+            : '0 6px 18px rgba(46,125,116,0.4)',
         }}>
           <IcShield size={22} />
           <span style={{ fontSize: 10, fontWeight: 700 }}>{t('navVault')}</span>
@@ -1920,6 +1923,10 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
 
       <HubHero icon={IcStar} title={t('rtYourStateCard', { name })} sub={covered ? t('rtYourStateSub') : t('rtYourStateSubBase')} onClick={() => setView('state')} />
       <HubHero icon={IcColumns} title={t('rtFederalCard')} sub={t('rtFederalSub2')} onClick={() => setView('federal')} />
+      {/* Regional centers are a California (Lanterman Act) construct - CA only. */}
+      {stateCode === 'CA' && (
+        <HubHero icon={IcMap} title={t('rcTitle')} sub={t('rcHeroSub')} onClick={() => setView('rc')} />
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
         {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { name })} onClick={() => setView('codes')} />}
@@ -1932,12 +1939,99 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
       {view === 'federal' && <FederalSheet onClose={() => setView(null)} />}
       {view === 'codes' && <CodesSheet code={stateCode} onClose={() => setView(null)} />}
       {view === 'others' && <OtherStatesSheet currentCode={stateCode} onClose={() => setView(null)} />}
+      {view === 'rc' && <RcSheet onClose={() => setView(null)} />}
       {view === 'help' && (
         <Modal onClose={() => setView(null)} title={t('helpContacts')}>
           <ContactsCard isCA={stateCode === 'CA'} />
         </Modal>
       )}
     </div>
+  )
+}
+
+// California regional center finder (CA only). Pick your county; the map
+// highlights your center's whole service area (calm - one region, not 21 colors)
+// and the card shows its contacts. Los Angeles County splits into 7 centers by
+// area, so it falls back to listing them + the DDS ZIP finder rather than guess.
+// The official DDS lookup is always linked as the current source of truth.
+function RegionalCenters() {
+  const t = useT()
+  const [county, setCounty] = useState('')
+  const rcId = county ? COUNTY_TO_RC[county] : null
+  const isLA = rcId === 'la'
+  const center = rcId && rcId !== 'la' ? CENTERS[rcId] : null
+  const highlight = new Set(county ? siblingCounties(county) : [])
+  const countyOptions = COUNTIES.map((c) => ({ value: c, label: c }))
+  const phoneHref = (p) => `tel:+1${p.replace(/\D/g, '')}`
+  const linkStyle = { color: C.accent, fontWeight: 600, textDecoration: 'none' }
+  const cardStyle = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '15px 16px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }
+
+  return (
+    <>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('rcIntro')}</div>
+
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 12, marginBottom: 14 }}>
+        <svg viewBox={CA_MAP.viewBox} role="img" aria-label={t('rcMapAria')} style={{ width: '100%', height: 'auto', maxHeight: '44vh', display: 'block' }}>
+          {COUNTIES.map((n) => {
+            const on = highlight.has(n)
+            const sel = n === county
+            return (
+              <path key={n} d={CA_MAP.paths[n]}
+                fill={on ? (sel ? C.accent : C.accentSoft) : '#EDEBE7'}
+                stroke={on ? C.accent : '#D3CFC8'} strokeWidth={sel ? 1.4 : 0.6} strokeLinejoin="round" />
+            )
+          })}
+        </svg>
+      </div>
+
+      <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>{t('rcYourCounty')}</label>
+      <Select value={county} onChange={setCounty} options={countyOptions} placeholder={t('rcCountyPh')} ariaLabel={t('rcYourCounty')} />
+
+      <div style={{ marginTop: 14 }}>
+        {!county && <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, padding: '0 2px' }}>{t('rcPickPrompt')}</div>}
+
+        {center && (
+          <div style={cardStyle}>
+            <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.ink, lineHeight: 1.3 }}>{center.name}</div>
+            <a href={phoneHref(center.phone)} style={{ ...linkStyle, display: 'inline-block', fontSize: 16, marginTop: 8 }}>{center.phone}</a>
+            <div style={{ marginTop: 6 }}>
+              <a href={center.website} target="_blank" rel="noreferrer" style={{ ...linkStyle, fontSize: 14 }}>{center.website.replace(/^https?:\/\//, '')}</a>
+            </div>
+            <div style={{ fontSize: 12.5, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>
+              <span style={{ fontWeight: 700, color: C.ink }}>{t('rcServes')}</span> {siblingCounties(county).join(', ')}
+            </div>
+          </div>
+        )}
+
+        {isLA && (
+          <div style={cardStyle}>
+            <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.55, marginBottom: 12 }}>{t('rcLaIntro')}</div>
+            {LA_CENTERS.map((c, i) => (
+              <div key={c.name} style={{ padding: '10px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.name}</div>
+                <div style={{ fontSize: 12.5, color: C.sub, marginTop: 2, lineHeight: 1.45 }}>{c.areas}</div>
+                <a href={phoneHref(c.phone)} style={{ ...linkStyle, fontSize: 14, display: 'inline-block', marginTop: 3 }}>{c.phone}</a>
+              </div>
+            ))}
+            <a href={DDS_LOOKUP_URL} target="_blank" rel="noreferrer" style={{ ...linkStyle, fontSize: 14, display: 'inline-block', marginTop: 12 }}>{t('rcLaFind')} →</a>
+          </div>
+        )}
+      </div>
+
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.55 }}>
+        {t('rcOfficialNote')}{' '}
+        <a href={DDS_LOOKUP_URL} target="_blank" rel="noreferrer" style={linkStyle}>{t('rcOfficialLink')}</a>
+      </div>
+    </>
+  )
+}
+
+function RcSheet({ onClose }) {
+  const t = useT()
+  return (
+    <Modal onClose={onClose} title={t('rcTitle')}>
+      <RegionalCenters />
+    </Modal>
   )
 }
 
@@ -2288,7 +2382,7 @@ function useVaultDocs(cloud) {
       }
       const rec = { id, name: file.name || '', mime: file.type || '', size: file.size, at: todayISO(), isImage, hasThumb, createdAt: Date.now() }
       setDocs((prev) => docSort([rec, ...prev]))
-      return { ok: true }
+      return { ok: true, id, isImage }
     } catch { return { error: 'read' } }
     finally { setBusy(false) }
   }, [cloud])
@@ -2302,10 +2396,11 @@ function useVaultDocs(cloud) {
   return { docs, busy, add, remove }
 }
 
-// One grid/list thumbnail: lazy-loads + decrypts its thumb only once scrolled
-// near view (IntersectionObserver), and revokes the blob URL on unmount so a
-// long vault never piles up object URLs.
-function DocThumb({ doc, cloud }) {
+// One lazy thumbnail: decrypts its 400px thumb only once scrolled near view
+// (IntersectionObserver) and revokes the blob URL on unmount so a long gallery
+// never piles up object URLs. `fill` makes it flex a square grid cell; otherwise
+// it's a fixed `size` box (incident photo strip).
+function DocThumb({ doc, cloud, size = 46, radius = 8, fill = false }) {
   const [url, setUrl] = useState(null)
   const [inView, setInView] = useState(false)
   const ref = useRef(null)
@@ -2329,21 +2424,95 @@ function DocThumb({ doc, cloud }) {
     })()
     return () => { alive = false; if (objUrl) URL.revokeObjectURL(objUrl) }
   }, [inView, doc, cloud])
-  const box = { width: 46, height: 46, flexShrink: 0, borderRadius: 8, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', color: C.ink3 }
+  const box = fill
+    ? { width: '100%', aspectRatio: '1 / 1', borderRadius: radius, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', color: C.ink3 }
+    : { width: size, height: size, flexShrink: 0, borderRadius: radius, background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', color: C.ink3 }
   if (doc.isImage && url) return <div ref={ref} style={box}><img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>
-  return <div ref={ref} style={box}><IcDoc size={20} /></div>
+  return <div ref={ref} style={box}><IcDoc size={fill ? 30 : 20} /></div>
 }
 
+// Full-screen photo viewer (like the Book gallery). Decrypts the FULL image on
+// demand, swipes/steps between photos, and (when onDelete is given) can delete
+// the photo in place. Portals to <body> above everything.
+function Lightbox({ photos, index = 0, cloud, onClose, onDelete }) {
+  const t = useT()
+  const [i, setI] = useState(index)
+  const [url, setUrl] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const touch = useRef({ x: 0, y: 0 })
+  useEscToClose(onClose)
+  // Clamp / close when the list shrinks out from under us (after a delete).
+  useEffect(() => {
+    if (photos.length === 0) { onClose(); return }
+    if (i > photos.length - 1) setI(photos.length - 1)
+  }, [photos.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  const doc = photos[Math.min(i, photos.length - 1)]
+  useEffect(() => {
+    if (!doc) return
+    let alive = true, obj
+    setLoading(true); setUrl(null)
+    ;(async () => {
+      const bytes = await cloud.downloadBytes(doc.id)
+      if (!alive) return
+      if (bytes) { obj = URL.createObjectURL(new Blob([bytes], { type: doc.mime || 'image/*' })); setUrl(obj) }
+      setLoading(false)
+    })()
+    return () => { alive = false; if (obj) URL.revokeObjectURL(obj) }
+  }, [doc, cloud])
+  const go = (d) => { if (photos.length > 1) setI((p) => (p + d + photos.length) % photos.length) }
+  const navBtn = (dir) => (
+    <button onClick={(e) => { e.stopPropagation(); go(dir === 'prev' ? -1 : 1) }} aria-label={t(dir === 'prev' ? 'lbPrev' : 'lbNext')}
+      style={{ position: 'absolute', top: '50%', transform: 'translateY(-50%)', [dir === 'prev' ? 'left' : 'right']: 8, width: 44, height: 44, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.16)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <IcChevron dir={dir === 'prev' ? 'left' : 'right'} size={24} style={{ color: '#fff' }} />
+    </button>
+  )
+  return createPortal(
+    <div
+      onClick={onClose}
+      onTouchStart={(e) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
+      onTouchEnd={(e) => {
+        const dx = e.changedTouches[0].clientX - touch.current.x
+        const dy = e.changedTouches[0].clientY - touch.current.y
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) go(dx < 0 ? 1 : -1)
+      }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1200, background: 'rgba(20,19,18,0.94)', display: 'flex', alignItems: 'center', justifyContent: 'center', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <button onClick={onClose} aria-label={t('close')} style={{ position: 'absolute', top: 'calc(env(safe-area-inset-top) + 10px)', right: 12, width: 40, height: 40, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,0.16)', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2 }}>
+        <IcX size={22} />
+      </button>
+      {loading && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>{t('lbLoading')}</div>}
+      {url && <img src={url} alt={doc?.name || ''} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />}
+      {photos.length > 1 && navBtn('prev')}
+      {photos.length > 1 && navBtn('next')}
+      <div style={{ position: 'absolute', bottom: 'calc(env(safe-area-inset-bottom) + 14px)', left: 0, right: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+        {photos.length > 1 && <div style={{ color: 'rgba(255,255,255,0.8)', fontSize: 13, fontWeight: 600 }}>{i + 1} / {photos.length}</div>}
+        {onDelete && doc && (
+          <button onClick={(e) => { e.stopPropagation(); onDelete(doc) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: 'rgba(192,69,44,0.92)', color: '#fff', border: 'none', borderRadius: 999, padding: '9px 18px', fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            <IcTrash size={16} /> {t('delete')}
+          </button>
+        )}
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// Documents & photos - a photo-gallery grid (like the Book). Images are
+// thumbnails that open a full-screen Lightbox; PDFs open in a new tab. Incident
+// photos land here too (they share this store), so it's one place for everything.
 function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded }) {
   const t = useT()
   const [error, setError] = useState('')
+  const [lightbox, setLightbox] = useState(null) // index into `images`
   const inputRef = useRef(null)
+  const images = docs.filter((d) => d.isImage)
+  const files = docs.filter((d) => !d.isImage)
 
   const onPick = async (e) => {
     setError('')
-    const files = Array.from(e.target.files || [])
+    const picked = Array.from(e.target.files || [])
     e.target.value = '' // allow re-picking the same file
-    for (const f of files) {
+    for (const f of picked) {
       const r = await onAdd(f)
       if (r?.error) { setError(t(r.error === 'big' ? 'docTooBig' : 'docUploadFailed')); break }
     }
@@ -2371,45 +2540,78 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded }) {
           {t('docsEmpty')}
         </div>
       ) : (
-        docs.map((doc) => (
-          <SwipeableRow
-            key={doc.id}
-            onTap={() => openDoc(doc)}
-            actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onRemove(doc) }]}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)', padding: '10px 12px' }}>
-              <DocThumb doc={doc} cloud={cloud} />
-              <div style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
-                <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || t('docFile')}</div>
-                <div style={{ fontSize: 12, color: C.sub, marginTop: 2 }}>{doc.at} · {formatBytes(doc.size)}</div>
-              </div>
-              {!IS_TOUCH && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); onRemove(doc) }}
-                  aria-label={t('delete')}
-                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, background: 'transparent', border: 'none', color: C.sub, cursor: 'pointer' }}
-                >
-                  <IcTrash size={16} />
+        <>
+          {images.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginTop: 6 }}>
+              {images.map((doc, idx) => (
+                <button key={doc.id} onClick={() => setLightbox(idx)} aria-label={doc.name || t('photo')}
+                  style={{ padding: 0, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', cursor: 'pointer', background: C.card }}>
+                  <DocThumb doc={doc} cloud={cloud} fill radius={11} />
                 </button>
-              )}
+              ))}
             </div>
-          </SwipeableRow>
-        ))
+          )}
+          {files.map((doc) => (
+            <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(43,42,40,0.04)', padding: '10px 12px', marginTop: 8 }}>
+              <button onClick={() => openDoc(doc)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                <DocThumb doc={doc} cloud={cloud} />
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || t('docFile')}</span>
+                  <span style={{ display: 'block', fontSize: 12, color: C.sub, marginTop: 2 }}>{doc.at} · {formatBytes(doc.size)}</span>
+                </span>
+              </button>
+              <button onClick={() => onRemove(doc)} aria-label={t('delete')}
+                style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, background: 'transparent', border: 'none', color: C.sub, cursor: 'pointer' }}>
+                <IcTrash size={16} />
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+      {lightbox !== null && (
+        <Lightbox photos={images} index={lightbox} cloud={cloud} onClose={() => setLightbox(null)} onDelete={(doc) => onRemove(doc)} />
       )}
     </>
   )
 }
 
-function IncidentSheet({ initial, onSave, onClose }) {
+// In-page incident form (add/edit). Rendered inside the Vault page's own
+// scroller - NOT a Modal - so fields route through the app-wide
+// useGlobalFieldRecenter that lifts them above the keyboard (the nested-Modal
+// version could not focus the lower fields on iOS). Photos are stored through
+// the shared docs store, so they also appear in the Documents gallery.
+function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud }) {
   const t = useT()
   const [at, setAt] = useState(initial?.at || todayISO())
   const [what, setWhat] = useState(initial?.what || '')
   const [where, setWhere] = useState(initial?.where || '')
   const [who, setWho] = useState(initial?.who || '')
+  const [photoIds, setPhotoIds] = useState(initial?.photoIds || [])
   const [error, setError] = useState('')
-  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '12px 0 6px' }
+  const [lb, setLb] = useState(null)
+  const photoInput = useRef(null)
+  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
+  const photoDocs = photoIds.map((id) => vaultDocs.docs.find((d) => d.id === id)).filter(Boolean)
+
+  const onPickPhoto = async (e) => {
+    setError('')
+    const picked = Array.from(e.target.files || [])
+    e.target.value = ''
+    for (const f of picked) {
+      const r = await vaultDocs.add(f)
+      if (r?.error) { setError(t(r.error === 'big' ? 'docTooBig' : 'docUploadFailed')); break }
+      if (r?.id) setPhotoIds((prev) => [...prev, r.id])
+    }
+  }
+  // Removing a photo deletes it outright (it is this incident's photo). Cancel
+  // won't undo a photo delete - it only abandons the text edits.
+  const removePhoto = (doc) => {
+    setPhotoIds((prev) => prev.filter((id) => id !== doc.id))
+    vaultDocs.remove(doc)
+  }
+
   return (
-    <Modal onClose={onClose} title={t(initial ? 'editIncident' : 'addIncident')}>
+    <>
       <label style={{ ...fieldLabel, marginTop: 0 }}>{t('incWhen')}</label>
       <input type="date" value={at} onChange={(e) => setAt(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />
       <label style={fieldLabel}>{t('incWhat')}</label>
@@ -2425,23 +2627,48 @@ function IncidentSheet({ initial, onSave, onClose }) {
       <input type="text" value={where} onChange={(e) => setWhere(e.target.value)} placeholder={t('incWherePh')} style={{ ...inputStyle, fontSize: 16 }} />
       <label style={fieldLabel}>{t('incWho')}</label>
       <input type="text" value={who} onChange={(e) => setWho(e.target.value)} placeholder={t('incWhoPh')} style={{ ...inputStyle, fontSize: 16 }} />
+
+      <label style={fieldLabel}>{t('incPhotos')}</label>
+      <input ref={photoInput} type="file" accept="image/*" multiple onChange={onPickPhoto} style={{ display: 'none' }} />
+      {photoDocs.length > 0 && (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+          {photoDocs.map((doc, idx) => (
+            <div key={doc.id} style={{ position: 'relative' }}>
+              <button onClick={() => setLb(idx)} aria-label={t('photo')} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'block' }}>
+                <DocThumb doc={doc} cloud={cloud} size={66} radius={12} />
+              </button>
+              <button onClick={() => removePhoto(doc)} aria-label={t('delete')}
+                style={{ position: 'absolute', top: -7, right: -7, width: 24, height: 24, borderRadius: '50%', border: '2px solid #fff', background: C.danger, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(43,42,40,0.3)' }}>
+                <IcX size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button disabled={vaultDocs.busy} onClick={() => photoInput.current?.click()} style={{ ...cloudBtn('secondary'), opacity: vaultDocs.busy ? 0.6 : 1 }}>
+        {vaultDocs.busy ? t('docUploading') : t('addPhoto')}
+      </button>
+
       <CloudNote error={error} />
       <button
         onClick={() => {
           if (!what.trim()) { setError(t('incNeedWhat')); return }
-          onSave({ ...(initial || {}), at: at || todayISO(), what: what.trim(), where: where.trim(), who: who.trim() })
-          onClose()
+          onSave({ ...(initial || {}), at: at || todayISO(), what: what.trim(), where: where.trim(), who: who.trim(), photoIds })
+          onCancel()
         }}
         style={{ ...cloudBtn('primary'), marginTop: 10 }}
       >
         {t('save')}
       </button>
-      <button onClick={onClose} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('cancel')}</button>
-    </Modal>
+      <button onClick={onCancel} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('cancel')}</button>
+      {lb !== null && <Lightbox photos={photoDocs} index={lb} cloud={cloud} onClose={() => setLb(null)} />}
+    </>
   )
 }
 
-function DeadlineSheet({ initial, onSave, onClose, isCA }) {
+// In-page denial-notice / deadline form (add/edit). In-page for the same
+// keyboard reason as IncidentForm.
+function DeadlineForm({ initial, onSave, onCancel, isCA }) {
   const t = useT()
   const [notice, setNotice] = useState(initial?.notice || todayISO())
   // The 60/90-day tracks are California law - only offer them in CA. Everywhere
@@ -2451,7 +2678,7 @@ function DeadlineSheet({ initial, onSave, onClose, isCA }) {
   const [label, setLabel] = useState(initial?.label || '')
   const [days, setDays] = useState(initial?.days ? String(initial.days) : (isCA ? '60' : '30'))
   const [error, setError] = useState('')
-  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '12px 0 6px' }
+  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
   const trackOptions = [
     { value: 'rc', label: t('trackRC') },
     { value: 'medical', label: t('trackMedical') },
@@ -2459,7 +2686,7 @@ function DeadlineSheet({ initial, onSave, onClose, isCA }) {
   ]
   const showDays = !isCA || track === 'custom'
   return (
-    <Modal onClose={onClose} title={t(initial ? 'editDeadline' : 'addDeadline')}>
+    <>
       {isCA && (
         <>
           <label style={{ ...fieldLabel, marginTop: 0 }}>{t('dlTrack')}</label>
@@ -2490,14 +2717,14 @@ function DeadlineSheet({ initial, onSave, onClose, isCA }) {
             notice, track: effTrack, label: label.trim(),
             days: effTrack === 'custom' ? Math.max(1, Number(days) || 30) : undefined,
           })
-          onClose()
+          onCancel()
         }}
         style={{ ...cloudBtn('primary'), marginTop: 10 }}
       >
         {t('save')}
       </button>
-      <button onClick={onClose} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('cancel')}</button>
-    </Modal>
+      <button onClick={onCancel} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('cancel')}</button>
+    </>
   )
 }
 
@@ -2594,18 +2821,21 @@ function HomeCheckSheet({ onClose, onSaveIncident }) {
 
 // Pick a common request, add a couple of details, and open a ready-to-print
 // letter. Stateless: it just builds a printable page (no vault storage needed).
-function LettersSheet({ onClose }) {
+// In-page request-letter builder. The template list and the fill-in form are
+// both rendered in the Vault page's scroller (no Modal); the page's top back
+// control returns to the hub, and "Back" here steps form -> list.
+function LettersView() {
   const t = useT()
   const [picked, setPicked] = useState(null)
   const [name, setName] = useState('')
   const [recipient, setRecipient] = useState('')
   const [details, setDetails] = useState('')
   const [err, setErr] = useState('')
-  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '12px 0 6px' }
+  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
 
   if (!picked) {
     return (
-      <Modal onClose={onClose} title={t('letters')}>
+      <>
         <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>{t('ltIntro')}</div>
         {LETTER_TEMPLATES.map((tpl) => (
           <button
@@ -2616,7 +2846,7 @@ function LettersSheet({ onClose }) {
             <IcChevron dir="right" size={18} style={{ color: C.ink3, flexShrink: 0 }} />
           </button>
         ))}
-      </Modal>
+      </>
     )
   }
 
@@ -2625,7 +2855,8 @@ function LettersSheet({ onClose }) {
     if (!openLetter(picked, { name: name.trim(), recipient: recipient.trim(), details: details.trim() }, t)) setErr(t('packetOpenFailed'))
   }
   return (
-    <Modal onClose={() => setPicked(null)} title={t(`lt_${picked}_title`)}>
+    <>
+      <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.ink, marginBottom: 6 }}>{t(`lt_${picked}_title`)}</div>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 4 }}>{t(`lt_${picked}_body`).split('\n\n')[0]}</div>
       <label style={fieldLabel}>{t('ltName')}</label>
       <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('ltNamePlaceholder')} style={{ ...inputStyle, fontSize: 16 }} />
@@ -2638,7 +2869,7 @@ function LettersSheet({ onClose }) {
       <button onClick={make} style={{ ...cloudBtn('primary'), marginTop: 12 }}>{t('ltOpen')}</button>
       <CloudNote error={err} />
       <button onClick={() => setPicked(null)} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('ltBack')}</button>
-    </Modal>
+    </>
   )
 }
 
@@ -2694,26 +2925,45 @@ function VaultTile({ icon, label, sub, onClick }) {
   )
 }
 
-// Labeled back control for a vault drill-in (clear text, not a bare chevron -
-// intuitive for every user).
-// The Vault is a bottom sheet opened from the raised center nav button. It shows
-// a grid of tiles; tapping one swaps to that tool's own sheet. Only one sheet is
-// mounted at a time - swiping it down (or Close) drops back one level (tool →
-// tiles → closed), so navigation is all "pull down", no back buttons.
-function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
+// The Vault is now its own PAGE/tab (like Rights), not a stack of sheets. A hub
+// of tiles; tapping one drills into that tool IN-PAGE with a labeled back
+// control. Add/edit forms are in-page too - so their fields ride the app-wide
+// keyboard recenter and nothing re-portals (no focus loss, no close "blink").
+function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
   const t = useT()
-  const [tool, setTool] = useState(null) // null(tiles) | incidents | deadlines | letters | documents | packet | contacts
+  const [view, setView] = useState('hub') // hub | incidents | deadlines | letters | documents | packet | contacts
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const [packetError, setPacketError] = useState('')
   const ready = cloud.status === 'ready'
-  const backToTiles = () => setTool(null)
 
   const makePacket = () => {
     setPacketError('')
     if (!openPacket(incidents, t, isCA)) setPacketError(t('packetOpenFailed'))
   }
+  // Deleting an incident also deletes its photos (they live in the shared docs
+  // store); vaultDocs.remove clears the bytes, the row, and the gallery.
+  const deleteIncident = (inc) => {
+    ;(inc.photoIds || []).forEach((pid) => {
+      const d = vaultDocs.docs.find((x) => x.id === pid)
+      if (d) vaultDocs.remove(d)
+    })
+    onDeleteIncident(inc.id)
+  }
 
+  const Page = ({ children }) => (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `10px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
+      {children}
+    </div>
+  )
+  const BackBar = ({ label, onBack, title }) => (
+    <>
+      <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'none', border: 'none', color: C.accent, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 0', margin: '0 0 6px' }}>
+        <IcChevron dir="left" size={18} style={{ color: C.accent }} /> {label}
+      </button>
+      {title && <div style={{ fontFamily: serif, fontSize: 23, fontWeight: 700, color: C.ink, margin: '0 2px 12px' }}>{title}</div>}
+    </>
+  )
   const emptyCard = (text) => (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>{text}</div>
   )
@@ -2723,7 +2973,7 @@ function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteInciden
     <SwipeableRow
       key={inc.id}
       onTap={() => setEditing(inc)}
-      actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDeleteIncident(inc.id) }]}
+      actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => deleteIncident(inc) }]}
     >
       <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
         <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
@@ -2731,10 +2981,15 @@ function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteInciden
           <div style={{ fontSize: 12, color: C.sub, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {inc.at}{inc.where ? ` · ${inc.where}` : ''}{inc.who ? ` · ${inc.who}` : ''}
           </div>
+          {inc.photoIds?.length > 0 && (
+            <div aria-label={t('photoCount', { n: inc.photoIds.length })} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, color: C.accent, marginTop: 4 }}>
+              <IcImage size={13} /> {inc.photoIds.length}
+            </div>
+          )}
         </div>
         {!IS_TOUCH && (
           <button
-            onClick={(e) => { e.stopPropagation(); onDeleteIncident(inc.id) }}
+            onClick={(e) => { e.stopPropagation(); deleteIncident(inc) }}
             aria-label={t('delete')}
             style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 46, background: 'transparent', border: 'none', borderLeft: `1px solid ${C.line}`, color: C.sub, cursor: 'pointer' }}
           >
@@ -2783,84 +3038,89 @@ function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteInciden
     )
   }
 
-  const editSheets = (
-    <>
-      {editing && (
-        <IncidentSheet initial={editing === 'new' ? null : editing} onSave={onSaveIncident} onClose={() => setEditing(null)} />
-      )}
-      {editingDl && (
-        <DeadlineSheet initial={editingDl === 'new' ? null : editingDl} onSave={onSaveDeadline} onClose={() => setEditingDl(null)} isCA={isCA} />
-      )}
-    </>
-  )
-
-  // Tiles / sign-in sheet (tool === null).
-  if (tool === null) {
+  // Signed out or locked: sign-in prompt + the public help lines.
+  if (!ready) {
     return (
-      <Modal onClose={onClose} title={t('navVault')}>
-        {!ready ? (
-          <>
-            <div style={{ background: C.bg, border: `1px solid ${C.line}`, borderRadius: 14, padding: '16px 14px', marginBottom: 18 }}>
-              <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
-              <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
-            </div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>{t('helpContacts')}</div>
-            <ContactsCard isCA={isCA} />
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.5, marginBottom: 14 }}>{t('vaultHubSub')}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setTool('incidents')} />
-              <VaultTile icon={<IcClock size={22} />} label={t('appealDeadlines')} sub={countText(deadlines.length)} onClick={() => setTool('deadlines')} />
-              <VaultTile icon={<IcMail size={22} />} label={t('letters')} sub={t('ltTileSub')} onClick={() => setTool('letters')} />
-              <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setTool('documents')} />
-              <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setTool('packet')} />
-              <VaultTile icon={<IcPhone size={22} />} label={t('helpContacts')} sub={t('tileContactsSub')} onClick={() => setTool('contacts')} />
-            </div>
-            <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
-          </>
-        )}
-      </Modal>
+      <Page>
+        <div style={{ fontFamily: serif, fontSize: 24, fontWeight: 700, margin: '6px 2px 4px' }}>{t('navVault')}</div>
+        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: '16px 14px', margin: '12px 0 18px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
+          <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>{t('helpContacts')}</div>
+        <ContactsCard isCA={isCA} />
+      </Page>
     )
   }
 
-  if (tool === 'incidents') {
+  if (view === 'hub') {
     return (
-      <>
-        <Modal onClose={backToTiles} title={t('incidentLog')}>
-          <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
-          {incidents.length === 0 ? emptyCard(t('vaultEmptyList')) : incidents.map(incidentRow)}
-        </Modal>
-        {editSheets}
-      </>
+      <Page>
+        <div style={{ fontFamily: serif, fontSize: 24, fontWeight: 700, margin: '6px 2px 4px' }}>{t('navVault')}</div>
+        <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('vaultHubSub')}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setView('incidents')} />
+          <VaultTile icon={<IcClock size={22} />} label={t('appealDeadlines')} sub={countText(deadlines.length)} onClick={() => setView('deadlines')} />
+          <VaultTile icon={<IcMail size={22} />} label={t('letters')} sub={t('ltTileSub')} onClick={() => setView('letters')} />
+          <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setView('documents')} />
+          <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setView('packet')} />
+          <VaultTile icon={<IcPhone size={22} />} label={t('helpContacts')} sub={t('tileContactsSub')} onClick={() => setView('contacts')} />
+        </div>
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
+      </Page>
     )
   }
 
-  if (tool === 'deadlines') {
+  if (view === 'incidents') {
+    if (editing) {
+      return (
+        <Page>
+          <BackBar label={t('incidentLog')} onBack={() => setEditing(null)} title={t(editing === 'new' ? 'addIncident' : 'editIncident')} />
+          <IncidentForm initial={editing === 'new' ? null : editing} onSave={onSaveIncident} onCancel={() => setEditing(null)} vaultDocs={vaultDocs} cloud={cloud} />
+        </Page>
+      )
+    }
     return (
-      <>
-        <Modal onClose={backToTiles} title={t('appealDeadlines')}>
-          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
-          <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
-          {deadlines.length === 0 ? emptyCard(t('vaultEmptyDl')) : deadlines.map(deadlineRow)}
-        </Modal>
-        {editSheets}
-      </>
+      <Page>
+        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('incidentLog')} />
+        <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
+        {incidents.length === 0 ? emptyCard(t('vaultEmptyList')) : incidents.map(incidentRow)}
+      </Page>
     )
   }
 
-  if (tool === 'documents') {
+  if (view === 'deadlines') {
+    if (editingDl) {
+      return (
+        <Page>
+          <BackBar label={t('appealDeadlines')} onBack={() => setEditingDl(null)} title={t(editingDl === 'new' ? 'addDeadline' : 'editDeadline')} />
+          <DeadlineForm initial={editingDl === 'new' ? null : editingDl} onSave={onSaveDeadline} onCancel={() => setEditingDl(null)} isCA={isCA} />
+        </Page>
+      )
+    }
     return (
-      <Modal onClose={backToTiles} title={t('docsTitle')}>
+      <Page>
+        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('appealDeadlines')} />
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
+        <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
+        {deadlines.length === 0 ? emptyCard(t('vaultEmptyDl')) : deadlines.map(deadlineRow)}
+      </Page>
+    )
+  }
+
+  if (view === 'documents') {
+    return (
+      <Page>
+        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('docsTitle')} />
         <DocsSection cloud={cloud} docs={vaultDocs.docs} busy={vaultDocs.busy} onAdd={vaultDocs.add} onRemove={vaultDocs.remove} embedded />
-      </Modal>
+      </Page>
     )
   }
 
-  if (tool === 'packet') {
+  if (view === 'packet') {
     return (
-      <Modal onClose={backToTiles} title={t('packet')}>
+      <Page>
+        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('packet')} />
         <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('packetSub')}</div>
         {incidents.length === 0 ? emptyCard(t('packetNeedIncident')) : (
           <>
@@ -2868,19 +3128,25 @@ function VaultSheet({ onClose, cloud, incidents, onSaveIncident, onDeleteInciden
             <CloudNote error={packetError} />
           </>
         )}
-      </Modal>
+      </Page>
     )
   }
 
-  if (tool === 'letters') {
-    return <LettersSheet onClose={backToTiles} />
+  if (view === 'letters') {
+    return (
+      <Page>
+        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('letters')} />
+        <LettersView />
+      </Page>
+    )
   }
 
   // contacts
   return (
-    <Modal onClose={backToTiles} title={t('helpContacts')}>
+    <Page>
+      <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('helpContacts')} />
       <ContactsCard isCA={isCA} />
-    </Modal>
+    </Page>
   )
 }
 
