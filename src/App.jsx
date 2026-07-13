@@ -1125,6 +1125,7 @@ export default function App() {
           onCloud={() => setShowCloud(true)}
           onHistory={() => setShowHistory(true)}
           connected={cloud.status === 'ready'}
+          showDisclaimer={tab === 'chat'}
         />
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} onSaveIncident={cloud.status === 'ready' ? incidents.save : undefined} />}
@@ -1192,7 +1193,7 @@ function IconBtn({ label, onClick, children }) {
   )
 }
 
-function Header({ onSettings, onCloud, onHistory, connected }) {
+function Header({ onSettings, onCloud, onHistory, connected, showDisclaimer }) {
   const t = useT()
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0', flexShrink: 0 }}>
@@ -1214,9 +1215,13 @@ function Header({ onSettings, onCloud, onHistory, connected }) {
         </div>
       </div>
       <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>{t('tagline')}</div>
-      <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '9px 12px', margin: '13px 0 0', lineHeight: 1.5 }}>
-        {t('disclaimer')}
-      </div>
+      {/* AI disclaimer only where questions are actually sent to the AI (Ask tab);
+          Vault and Rights keep the header compact so their content fits statically. */}
+      {showDisclaimer && (
+        <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '9px 12px', margin: '13px 0 0', lineHeight: 1.5 }}>
+          {t('disclaimer')}
+        </div>
+      )}
     </div>
   )
 }
