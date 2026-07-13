@@ -5,6 +5,7 @@ import { useCloud, mergeConversations } from './cloud.js'
 import { LANG_OPTIONS, LangContext, getStoredLang, storeLang, useT, tr } from './i18n.js'
 import { CENTERS, COUNTY_TO_RC, LA_CENTERS, COUNTIES, siblingCounties, CA_MAP, DDS_LOOKUP_URL } from './regionalCenters.js'
 import { STATE_GUIDE, hasStateGuide } from './stateGuide.js'
+import { FEDERAL_TERMS, getStateTerms } from './glossary.js'
 
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
@@ -177,6 +178,13 @@ const IcPhone = ({ size = 24, style }) => (
 const IcShield = ({ size = 24, style }) => (
   <SvgIcon size={size} style={style}>
     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+  </SvgIcon>
+)
+// Glossary button (open book).
+const IcBook = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z" />
+    <path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z" />
   </SvgIcon>
 )
 // Saved-questions list icon for the History button.
@@ -936,6 +944,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [showCloud, setShowCloud] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [showGlossary, setShowGlossary] = useState(false)
   // '' = never chosen -> first-launch prompt asks. Chosen state grounds every
   // answer (sent with each question) and drives the Rights page split.
   const [stateCode, setStateCode] = useState(() => {
@@ -1124,6 +1133,7 @@ export default function App() {
           onSettings={() => setShowSettings(true)}
           onCloud={() => setShowCloud(true)}
           onHistory={() => setShowHistory(true)}
+          onGlossary={() => setShowGlossary(true)}
           connected={cloud.status === 'ready'}
           showDisclaimer={tab === 'chat'}
         />
@@ -1169,6 +1179,7 @@ export default function App() {
         />
       )}
       {showCloud && <CloudSheet onClose={() => setShowCloud(false)} cloud={cloud} />}
+      {showGlossary && <GlossarySheet onClose={() => setShowGlossary(false)} stateCode={stateCode || 'CA'} />}
     </div>
     </LangContext.Provider>
   )
@@ -1193,7 +1204,7 @@ function IconBtn({ label, onClick, children }) {
   )
 }
 
-function Header({ onSettings, onCloud, onHistory, connected, showDisclaimer }) {
+function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDisclaimer }) {
   const t = useT()
   return (
     <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0', flexShrink: 0 }}>
@@ -1202,6 +1213,7 @@ function Header({ onSettings, onCloud, onHistory, connected, showDisclaimer }) {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ fontFamily: serif, fontSize: 27, fontWeight: 700, letterSpacing: -0.3, lineHeight: 1, color: C.ink }}>HandBook</div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <IconBtn label={t('glossary')} onClick={onGlossary}><IcBook size={19} /></IconBtn>
           <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={19} /></IconBtn>
           <IconBtn label={connected ? t('accountSynced') : t('cloudSync')} onClick={onCloud}>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
@@ -1630,6 +1642,63 @@ function HistorySheet({ onClose, conversations, onOpen, onDelete, connected }) {
   return (
     <Modal onClose={onClose} title={t('savedQuestions')}>
       <History conversations={conversations} onOpen={onOpen} onDelete={onDelete} connected={connected} embedded />
+    </Modal>
+  )
+}
+
+// Glossary as a bottom sheet, opened from the book icon in the header on every
+// tab. State terms lead (the jargon on the person's actual paperwork), then the
+// everywhere terms. One search box filters both; definitions are English like
+// the corpus, chrome is translated.
+function GlossarySheet({ onClose, stateCode }) {
+  const t = useT()
+  const [q, setQ] = useState('')
+  const needle = q.trim().toLowerCase()
+  const match = (e) => !needle
+    || e.term.toLowerCase().includes(needle)
+    || (e.full || '').toLowerCase().includes(needle)
+    || e.def.toLowerCase().includes(needle)
+  const stateHits = getStateTerms(stateCode).filter(match)
+  const fedHits = FEDERAL_TERMS.filter(match)
+
+  const sectionHead = (label) => (
+    <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub, margin: '18px 2px 8px' }}>{label}</div>
+  )
+  const row = (e) => (
+    <div key={e.term} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px 14px', marginBottom: 8, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+      <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>
+        {e.term}
+        {e.full && <span style={{ fontWeight: 400, color: C.sub }}> · {e.full}</span>}
+      </div>
+      <div style={{ fontSize: 13.5, color: C.ink, lineHeight: 1.55, marginTop: 4 }}>{e.def}</div>
+    </div>
+  )
+
+  return (
+    <Modal onClose={onClose} title={t('glossary')}>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('glossarySub')}</div>
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder={t('glossarySearch')}
+        aria-label={t('glossarySearch')}
+        style={inputStyle}
+      />
+      {stateHits.length > 0 && (
+        <>
+          {sectionHead(t('glossaryStateSection', { name: stateName(stateCode) }))}
+          {stateHits.map(row)}
+        </>
+      )}
+      {fedHits.length > 0 && (
+        <>
+          {sectionHead(t('glossaryFederalSection'))}
+          {fedHits.map(row)}
+        </>
+      )}
+      {stateHits.length === 0 && fedHits.length === 0 && (
+        <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '18px 2px' }}>{t('glossaryNoMatch')}</div>
+      )}
     </Modal>
   )
 }
