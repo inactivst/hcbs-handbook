@@ -42,6 +42,7 @@ const C = {
   accent: '#2E7D74',
   accentSoft: '#E4EEEC',
   danger: '#C0452C',
+  cloudOk: '#2E8B40', // brighter "sync is working" green - the portfolio-wide cloud cue (GuestBook/BlackBook)
 }
 
 const IS_TOUCH = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)')?.matches
@@ -128,6 +129,14 @@ const IcSettings = ({ size = 24, style }) => (
 const IcCloud = ({ size = 24, style }) => (
   <SvgIcon size={size} style={style}>
     <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+  </SvgIcon>
+)
+// Cloud with a check inside - the portfolio-wide "sync is working" cue
+// (GuestBook header + BlackBook paid-sync cloud use the same glyph).
+const IcCloudCheck = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+    <path d="M9 14.5l2 2 4-4.5" />
   </SvgIcon>
 )
 const IcTrash = ({ size = 24, style }) => (
@@ -1216,13 +1225,12 @@ function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDis
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           <IconBtn label={t('glossary')} onClick={onGlossary}><IcBook size={18} /></IconBtn>
           <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={18} /></IconBtn>
+          {/* Connected = glowing green cloud-with-check (the portfolio sync cue);
+              signed out = the plain muted cloud. No dot badge - the check says it. */}
           <IconBtn label={connected ? t('accountSynced') : t('cloudSync')} onClick={onCloud}>
-            <span style={{ position: 'relative', display: 'inline-flex' }}>
-              <IcCloud size={18} style={connected ? { color: C.accent } : undefined} />
-              {connected && (
-                <span style={{ position: 'absolute', right: -3, top: -2, width: 7, height: 7, borderRadius: '50%', background: C.accent, border: `1.5px solid ${C.surface}` }} />
-              )}
-            </span>
+            {connected
+              ? <IcCloudCheck size={18} style={{ color: C.cloudOk, strokeWidth: 1.8, filter: 'drop-shadow(0 0 3px rgba(46,139,64,0.85))' }} />
+              : <IcCloud size={18} />}
           </IconBtn>
           <IconBtn label={t('settings')} onClick={onSettings}><IcSettings size={18} /></IconBtn>
         </div>
