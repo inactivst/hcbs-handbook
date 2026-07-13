@@ -1923,15 +1923,19 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
 
       <HubHero icon={IcStar} title={t('rtYourStateCard', { name })} sub={covered ? t('rtYourStateSub') : t('rtYourStateSubBase')} onClick={() => setView('state')} />
       <HubHero icon={IcColumns} title={t('rtFederalCard')} sub={t('rtFederalSub2')} onClick={() => setView('federal')} />
-      {/* Regional centers are a California (Lanterman Act) construct - CA only. */}
-      {stateCode === 'CA' && (
-        <HubHero icon={IcMap} title={t('rcTitle')} sub={t('rcHeroSub')} onClick={() => setView('rc')} />
-      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
         {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { name })} onClick={() => setView('codes')} />}
-        <VaultTile icon={<IcMap size={22} />} label={t('rtTileOthers')} sub={t('rtTileOthersSub')} onClick={() => setView('others')} />
+        {/* Regional centers are a California (Lanterman Act) construct - CA only. */}
+        {stateCode === 'CA' && (
+          <VaultTile icon={<IcMap size={22} />} label={t('rtTileRc')} sub={t('rtTileRcSub')} onClick={() => setView('rc')} />
+        )}
         <VaultTile icon={<IcPhone size={22} />} label={t('rtTileHelp')} sub={t('rtTileHelpSub')} onClick={() => setView('help')} />
+      </div>
+
+      {/* Other states spans full width below the primary cards - every state gets the federal floor. */}
+      <div style={{ marginTop: 12 }}>
+        <HubHero icon={IcMap} title={t('rtTileOthers')} sub={t('rtTileOthersSub')} onClick={() => setView('others')} />
       </div>
 
       {showCheck && <HomeCheckSheet onClose={() => setShowCheck(false)} onSaveIncident={onSaveIncident} />}
