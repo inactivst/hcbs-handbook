@@ -1141,8 +1141,8 @@ export default function App() {
         <Header
           onSettings={() => setShowSettings(true)}
           onCloud={() => setShowCloud(true)}
-          onHistory={() => setShowHistory(true)}
-          onGlossary={() => setShowGlossary(true)}
+          onHistory={tab === 'chat' ? () => setShowHistory(true) : undefined}
+          onGlossary={tab !== 'chat' ? () => setShowGlossary(true) : undefined}
           connected={cloud.status === 'ready'}
           showDisclaimer={tab === 'chat'}
         />
@@ -1223,8 +1223,8 @@ function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDis
       <div style={{ padding: 'calc(env(safe-area-inset-top) + 10px) 16px 10px', borderBottom: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ fontFamily: serif, fontSize: 20, fontWeight: 700, letterSpacing: -0.2, lineHeight: 1, color: C.ink }}>HandBook</div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <IconBtn label={t('glossary')} onClick={onGlossary}><IcBook size={18} /></IconBtn>
-          <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={18} /></IconBtn>
+          {onGlossary && <IconBtn label={t('glossary')} onClick={onGlossary}><IcBook size={18} /></IconBtn>}
+          {onHistory && <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={18} /></IconBtn>}
           {/* Connected = glowing green cloud-with-check (the portfolio sync cue);
               signed out = the plain muted cloud. No dot badge - the check says it. */}
           <IconBtn label={connected ? t('accountSynced') : t('cloudSync')} onClick={onCloud}>

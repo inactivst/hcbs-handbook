@@ -20,7 +20,7 @@ export const LANG_NAMES = { en: 'English', es: 'Spanish', tl: 'Tagalog' }
 const STRINGS = {
   en: {
     tagline: 'Your Home & Community-Based Services (HCBS) rights, in plain language',
-    disclaimer: "General information, not legal advice. Your questions are sent to an AI service to answer them, so please leave out names and other personal details. Your saved history and Vault stay private to you.",
+    disclaimer: "General information, not legal advice. Your questions are sent to an AI service to answer them, so please leave out names and other personal details. Your saved questions stay private to you.",
     accountSynced: 'Account (synced)',
     cloudSync: 'Cloud sync',
     settings: 'Settings',
@@ -397,7 +397,7 @@ const STRINGS = {
   },
   es: {
     tagline: 'Tus derechos de Servicios en el Hogar y la Comunidad (HCBS), en lenguaje sencillo',
-    disclaimer: 'Información general, no asesoría legal. Tus preguntas se envían a un servicio de inteligencia artificial para responderlas, así que por favor no incluyas nombres ni otros datos personales. Tu historial guardado y tu Bóveda quedan privados y solo para ti.',
+    disclaimer: 'Información general, no asesoría legal. Tus preguntas se envían a un servicio de inteligencia artificial para responderlas, así que por favor no incluyas nombres ni otros datos personales. Tus preguntas guardadas quedan privadas y solo para ti.',
     accountSynced: 'Cuenta (sincronizada)',
     cloudSync: 'Sincronización en la nube',
     settings: 'Configuración',
@@ -773,7 +773,7 @@ const STRINGS = {
   },
   tl: {
     tagline: 'Ang iyong mga karapatan sa Home and Community-Based Services (HCBS), sa simpleng wika',
-    disclaimer: 'Pangkalahatang impormasyon, hindi legal na payo. Ang mga tanong mo ay ipinapadala sa isang AI service para masagot, kaya huwag maglagay ng mga pangalan o iba pang personal na detalye. Ang naka-save mong history at Vault ay nananatiling pribado, para sa iyo lang.',
+    disclaimer: 'Pangkalahatang impormasyon, hindi legal na payo. Ang mga tanong mo ay ipinapadala sa isang AI service para masagot, kaya huwag maglagay ng mga pangalan o iba pang personal na detalye. Ang naka-save mong mga tanong ay nananatiling pribado, para sa iyo lang.',
     accountSynced: 'Account (naka-sync)',
     cloudSync: 'Cloud sync',
     settings: 'Mga Setting',
