@@ -4,6 +4,7 @@ import { FEDERAL, STATES, US_STATES } from '../api/_corpus.js'
 import { useCloud, mergeConversations } from './cloud.js'
 import { LANG_OPTIONS, LangContext, getStoredLang, storeLang, useT, tr } from './i18n.js'
 import { CENTERS, COUNTY_TO_RC, LA_CENTERS, COUNTIES, siblingCounties, CA_MAP, DDS_LOOKUP_URL } from './regionalCenters.js'
+import { STATE_GUIDE, hasStateGuide } from './stateGuide.js'
 
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
@@ -1139,6 +1140,7 @@ export default function App() {
             vaultDocs={vaultDocs}
             onOpenAccount={() => setShowCloud(true)}
             isCA={(stateCode || 'CA') === 'CA'}
+            stateCode={stateCode || 'CA'}
           />
         )}
       </div>
@@ -1887,6 +1889,37 @@ function OtherStatesSheet({ currentCode, onClose }) {
   )
 }
 
+// The California "regional center" equivalent for the other big states: the local
+// entry-point agency (LIDDA, APD office, OPWDD Front Door, county MH/ID office,
+// ISC agency...), how to start there, and who runs it. Every fact is verified in
+// stateGuide.js against an official source. Content is English (like the corpus);
+// the chrome is translated. CA keeps its bespoke county->center finder (RcSheet).
+function WhereToStartSheet({ code, onClose }) {
+  const t = useT()
+  const g = STATE_GUIDE[code]
+  if (!g) return null
+  const linkBtn = (kind) => ({ ...cloudBtn(kind), textDecoration: 'none', textAlign: 'center', display: 'block' })
+  const secTitle = { fontSize: 12, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.6, margin: '20px 2px 8px' }
+  return (
+    <Modal onClose={onClose} title={t('rtTileStart')}>
+      <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{g.entry.what}</div>
+      <a href={g.entry.findUrl} target="_blank" rel="noreferrer" style={linkBtn('primary')}>{t('wtsFindBtn')}</a>
+
+      <div style={secTitle}>{t('wtsHowStart')}</div>
+      <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 10 }}>{g.start.text}</div>
+      <a href={g.start.url} target="_blank" rel="noreferrer" style={linkBtn('secondary')}>{t('wtsVisit')}</a>
+
+      <div style={secTitle}>{t('wtsWhoRuns')}</div>
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <a href={g.agency.url} target="_blank" rel="noreferrer" style={{ fontSize: 15, fontWeight: 600, color: C.accent, textDecoration: 'none' }}>{g.agency.name}</a>
+        <div style={{ fontSize: 13, color: C.sub, marginTop: 6, lineHeight: 1.5 }}><span style={{ fontWeight: 700, color: C.ink }}>{t('wtsPrograms')}:</span> {g.waivers}</div>
+      </div>
+
+      <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.5 }}>{t('wtsHelpHint')}</div>
+    </Modal>
+  )
+}
+
 // The Rights hub: a calm landing of a few big choices (the vault pattern), not
 // one long scroll. The state / federal "sorter" leads; each card opens a focused
 // sheet of plain-language, grouped guides. The public self-check stays featured.
@@ -1930,6 +1963,10 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
         {stateCode === 'CA' && (
           <VaultTile icon={<IcMap size={22} />} label={t('rtTileRc')} sub={t('rtTileRcSub')} onClick={() => setView('rc')} />
         )}
+        {/* The regional-center equivalent for other big states (LIDDA, APD, OPWDD...). */}
+        {hasStateGuide(stateCode) && (
+          <VaultTile icon={<IcMap size={22} />} label={t('rtTileStart')} sub={t('rtTileStartSub')} onClick={() => setView('start')} />
+        )}
         <VaultTile icon={<IcPhone size={22} />} label={t('rtTileHelp')} sub={t('rtTileHelpSub')} onClick={() => setView('help')} />
       </div>
 
@@ -1944,9 +1981,10 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
       {view === 'codes' && <CodesSheet code={stateCode} onClose={() => setView(null)} />}
       {view === 'others' && <OtherStatesSheet currentCode={stateCode} onClose={() => setView(null)} />}
       {view === 'rc' && <RcSheet onClose={() => setView(null)} />}
+      {view === 'start' && <WhereToStartSheet code={stateCode} onClose={() => setView(null)} />}
       {view === 'help' && (
         <Modal onClose={() => setView(null)} title={t('helpContacts')}>
-          <ContactsCard isCA={stateCode === 'CA'} />
+          <ContactsCard stateCode={stateCode} />
         </Modal>
       )}
     </div>
@@ -2127,6 +2165,12 @@ const CA_CONTACTS = [
 const UNIVERSAL_CONTACTS = [
   { name: 'NDRN', descKey: 'cNdrn', url: 'ndrn.org' },
 ]
+// Build a tel: link. Short codes like 2-1-1 (Texas fair hearings) must dial as-is,
+// never as +1211; only full 10/11-digit numbers get the +1 country code.
+const telHref = (phone) => {
+  const d = phone.replace(/\D/g, '')
+  return d.length <= 4 ? `tel:${d}` : `tel:+1${d.replace(/^1/, '')}`
+}
 
 // Escape user-entered incident text before it goes into the packet HTML so a
 // stray "<" can never break (or inject into) the printable document.
@@ -2579,11 +2623,13 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded }) {
   )
 }
 
-// In-page incident form (add/edit). Rendered inside the Vault page's own
-// scroller - NOT a Modal - so fields route through the app-wide
-// useGlobalFieldRecenter that lifts them above the keyboard (the nested-Modal
-// version could not focus the lower fields on iOS). Photos are stored through
-// the shared docs store, so they also appear in the Documents gallery.
+// Incident form (add/edit), nested inside the Incident-log sheet (like the Rights
+// OtherStatesSheet). HISTORY / WATCH: an earlier nested-Modal version could not
+// focus the lower fields on iOS, which is why this once lived in-page. The Modal
+// has since been pinned to the visual viewport (see Modal's vvRect), so the sheet
+// sits above the keyboard on its own - device-test the lower fields (Where/Who)
+// after any change here. Photos are stored through the shared docs store, so they
+// also appear in the Documents gallery.
 function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud }) {
   const t = useT()
   const [at, setAt] = useState(initial?.at || todayISO())
@@ -2670,8 +2716,8 @@ function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud }) {
   )
 }
 
-// In-page denial-notice / deadline form (add/edit). In-page for the same
-// keyboard reason as IncidentForm.
+// Denial-notice / deadline form (add/edit), nested inside the Deadlines sheet.
+// Same iOS keyboard caveat as IncidentForm - device-test fields above the fold.
 function DeadlineForm({ initial, onSave, onCancel, isCA }) {
   const t = useT()
   const [notice, setNotice] = useState(initial?.notice || todayISO())
@@ -2825,9 +2871,8 @@ function HomeCheckSheet({ onClose, onSaveIncident }) {
 
 // Pick a common request, add a couple of details, and open a ready-to-print
 // letter. Stateless: it just builds a printable page (no vault storage needed).
-// In-page request-letter builder. The template list and the fill-in form are
-// both rendered in the Vault page's scroller (no Modal); the page's top back
-// control returns to the hub, and "Back" here steps form -> list.
+// Request-letter builder, rendered inside the Letters sheet. Its own "Back"
+// steps form -> template list; the sheet is dismissed by swipe-down / tap-away.
 function LettersView() {
   const t = useT()
   const [picked, setPicked] = useState(null)
@@ -2877,24 +2922,32 @@ function LettersView() {
   )
 }
 
-function ContactsCard({ isCA }) {
+function ContactsCard({ stateCode }) {
   const t = useT()
-  // CA gets its verified agency lines; every other state gets only what is true
-  // everywhere (the NDRN P&A finder) plus a pointer to its own Rights tab, so we
-  // never show a Californian a Texas number or invent one we haven't verified.
-  const list = isCA ? [...CA_CONTACTS, ...UNIVERSAL_CONTACTS] : UNIVERSAL_CONTACTS
+  const code = stateCode || 'CA'
+  const guide = STATE_GUIDE[code]
+  // CA has its own verified agency lines; the other big states get their pack
+  // from stateGuide.js (also verified against official sources); every remaining
+  // state gets only what is true everywhere (the NDRN P&A finder) plus a pointer
+  // to its Rights tab, so we never show someone another state's number or invent
+  // one we haven't verified.
+  const list = code === 'CA'
+    ? [...CA_CONTACTS, ...UNIVERSAL_CONTACTS]
+    : guide
+      ? [...guide.contacts, ...UNIVERSAL_CONTACTS]
+      : UNIVERSAL_CONTACTS
   return (
     <>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
-        {isCA ? t('contactsSub') : t('contactsNote')}
+        {code === 'CA' || guide ? t('contactsSub') : t('contactsNote')}
       </div>
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '6px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
         {list.map((c, i) => (
           <div key={c.name} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.name}</div>
-            <div style={{ fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 1.5 }}>{t(c.descKey)}</div>
+            <div style={{ fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 1.5 }}>{c.descKey ? t(c.descKey) : c.desc}</div>
             {c.phone ? (
-              <a href={`tel:+1${c.phone.replace(/\D/g, '').replace(/^1/, '')}`} style={{ fontSize: 14, fontWeight: 600, color: C.accent, textDecoration: 'none', marginTop: 3, display: 'inline-block' }}>
+              <a href={telHref(c.phone)} style={{ fontSize: 14, fontWeight: 600, color: C.accent, textDecoration: 'none', marginTop: 3, display: 'inline-block' }}>
                 {c.phone}
               </a>
             ) : (
@@ -2933,7 +2986,7 @@ function VaultTile({ icon, label, sub, onClick }) {
 // of tiles; tapping one drills into that tool IN-PAGE with a labeled back
 // control. Add/edit forms are in-page too - so their fields ride the app-wide
 // keyboard recenter and nothing re-portals (no focus loss, no close "blink").
-function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
+function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA, stateCode }) {
   const t = useT()
   const [view, setView] = useState('hub') // hub | incidents | deadlines | letters | documents | packet | contacts
   const [editing, setEditing] = useState(null) // null | 'new' | incident
@@ -2960,13 +3013,14 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
       {children}
     </div>
   )
-  const BackBar = ({ label, onBack, title }) => (
-    <>
-      <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'none', border: 'none', color: C.accent, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', padding: '4px 0', margin: '0 0 6px' }}>
-        <IcChevron dir="left" size={18} style={{ color: C.accent }} /> {label}
-      </button>
-      {title && <div style={{ fontFamily: serif, fontSize: 23, fontWeight: 700, color: C.ink, margin: '0 2px 12px' }}>{title}</div>}
-    </>
+  // Close whatever drill-in sheet is open and land back on the hub.
+  const closeSheet = () => { setView('hub'); setEditing(null); setEditingDl(null); setPacketError('') }
+  // In-sheet back link (form -> list), mirroring the Rights OtherStatesSheet. The
+  // sheet itself is dismissed by swipe-down / tap-away; this only steps back a level.
+  const SheetBack = ({ label, onBack }) => (
+    <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: C.accent, cursor: 'pointer', padding: '2px 2px 12px', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
+      <IcChevron dir="left" size={15} /> {label}
+    </button>
   )
   const emptyCard = (text) => (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>{text}</div>
@@ -3052,13 +3106,17 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
           <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
         </div>
         <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>{t('helpContacts')}</div>
-        <ContactsCard isCA={isCA} />
+        <ContactsCard stateCode={stateCode} />
       </Page>
     )
   }
 
-  if (view === 'hub') {
-    return (
+  // The hub is always the page underneath; each tile opens a swipe-to-close sheet
+  // over it (matching the Rights hub), not an in-page back-button view. The sheets
+  // are siblings of <Page> (not children) so they keep the stable top-level Modal
+  // type and never remount when the hub re-renders (e.g. a photo upload lands).
+  return (
+    <>
       <Page>
         <div style={{ fontFamily: serif, fontSize: 24, fontWeight: 700, margin: '6px 2px 4px' }}>{t('navVault')}</div>
         <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('vaultHubSub')}</div>
@@ -3072,85 +3130,70 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
         </div>
         <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
       </Page>
-    )
-  }
 
-  if (view === 'incidents') {
-    if (editing) {
-      return (
-        <Page>
-          <BackBar label={t('incidentLog')} onBack={() => setEditing(null)} title={t(editing === 'new' ? 'addIncident' : 'editIncident')} />
-          <IncidentForm initial={editing === 'new' ? null : editing} onSave={onSaveIncident} onCancel={() => setEditing(null)} vaultDocs={vaultDocs} cloud={cloud} />
-        </Page>
-      )
-    }
-    return (
-      <Page>
-        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('incidentLog')} />
-        <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
-        {incidents.length === 0 ? emptyCard(t('vaultEmptyList')) : incidents.map(incidentRow)}
-      </Page>
-    )
-  }
+      {view === 'incidents' && (
+        <Modal onClose={closeSheet} title={editing ? t(editing === 'new' ? 'addIncident' : 'editIncident') : t('incidentLog')}>
+          {editing ? (
+            <>
+              <SheetBack label={t('incidentLog')} onBack={() => setEditing(null)} />
+              <IncidentForm initial={editing === 'new' ? null : editing} onSave={onSaveIncident} onCancel={() => setEditing(null)} vaultDocs={vaultDocs} cloud={cloud} />
+            </>
+          ) : (
+            <>
+              <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
+              {incidents.length === 0 ? emptyCard(t('vaultEmptyList')) : incidents.map(incidentRow)}
+            </>
+          )}
+        </Modal>
+      )}
 
-  if (view === 'deadlines') {
-    if (editingDl) {
-      return (
-        <Page>
-          <BackBar label={t('appealDeadlines')} onBack={() => setEditingDl(null)} title={t(editingDl === 'new' ? 'addDeadline' : 'editDeadline')} />
-          <DeadlineForm initial={editingDl === 'new' ? null : editingDl} onSave={onSaveDeadline} onCancel={() => setEditingDl(null)} isCA={isCA} />
-        </Page>
-      )
-    }
-    return (
-      <Page>
-        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('appealDeadlines')} />
-        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
-        <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
-        {deadlines.length === 0 ? emptyCard(t('vaultEmptyDl')) : deadlines.map(deadlineRow)}
-      </Page>
-    )
-  }
+      {view === 'deadlines' && (
+        <Modal onClose={closeSheet} title={editingDl ? t(editingDl === 'new' ? 'addDeadline' : 'editDeadline') : t('appealDeadlines')}>
+          {editingDl ? (
+            <>
+              <SheetBack label={t('appealDeadlines')} onBack={() => setEditingDl(null)} />
+              <DeadlineForm initial={editingDl === 'new' ? null : editingDl} onSave={onSaveDeadline} onCancel={() => setEditingDl(null)} isCA={isCA} />
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
+              <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
+              {deadlines.length === 0 ? emptyCard(t('vaultEmptyDl')) : deadlines.map(deadlineRow)}
+            </>
+          )}
+        </Modal>
+      )}
 
-  if (view === 'documents') {
-    return (
-      <Page>
-        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('docsTitle')} />
-        <DocsSection cloud={cloud} docs={vaultDocs.docs} busy={vaultDocs.busy} onAdd={vaultDocs.add} onRemove={vaultDocs.remove} embedded />
-      </Page>
-    )
-  }
+      {view === 'documents' && (
+        <Modal onClose={closeSheet} title={t('docsTitle')}>
+          <DocsSection cloud={cloud} docs={vaultDocs.docs} busy={vaultDocs.busy} onAdd={vaultDocs.add} onRemove={vaultDocs.remove} embedded />
+        </Modal>
+      )}
 
-  if (view === 'packet') {
-    return (
-      <Page>
-        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('packet')} />
-        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('packetSub')}</div>
-        {incidents.length === 0 ? emptyCard(t('packetNeedIncident')) : (
-          <>
-            <button onClick={makePacket} style={cloudBtn('primary')}>{t('createPacket')}</button>
-            <CloudNote error={packetError} />
-          </>
-        )}
-      </Page>
-    )
-  }
+      {view === 'packet' && (
+        <Modal onClose={closeSheet} title={t('packet')}>
+          <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('packetSub')}</div>
+          {incidents.length === 0 ? emptyCard(t('packetNeedIncident')) : (
+            <>
+              <button onClick={makePacket} style={cloudBtn('primary')}>{t('createPacket')}</button>
+              <CloudNote error={packetError} />
+            </>
+          )}
+        </Modal>
+      )}
 
-  if (view === 'letters') {
-    return (
-      <Page>
-        <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('letters')} />
-        <LettersView />
-      </Page>
-    )
-  }
+      {view === 'letters' && (
+        <Modal onClose={closeSheet} title={t('letters')}>
+          <LettersView />
+        </Modal>
+      )}
 
-  // contacts
-  return (
-    <Page>
-      <BackBar label={t('navVault')} onBack={() => setView('hub')} title={t('helpContacts')} />
-      <ContactsCard isCA={isCA} />
-    </Page>
+      {view === 'contacts' && (
+        <Modal onClose={closeSheet} title={t('helpContacts')}>
+          <ContactsCard stateCode={stateCode} />
+        </Modal>
+      )}
+    </>
   )
 }
 
