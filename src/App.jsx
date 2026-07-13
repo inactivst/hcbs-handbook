@@ -1207,35 +1207,44 @@ function IconBtn({ label, onClick, children }) {
 function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDisclaimer }) {
   const t = useT()
   return (
-    <div style={{ padding: 'calc(env(safe-area-inset-top) + 14px) 16px 0', flexShrink: 0 }}>
-      {/* Wordmark + actions share the top row; the tagline sits full-width below
-          so it never wraps awkwardly against the icon cluster. */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ fontFamily: serif, fontSize: 27, fontWeight: 700, letterSpacing: -0.3, lineHeight: 1, color: C.ink }}>HandBook</div>
+    <div style={{ flexShrink: 0 }}>
+      {/* Slim app-chrome bar: a small wordmark + actions, closed off by a hairline
+          so it reads as chrome. Each page's own serif title is the only big
+          headline below it - the wordmark never competes with page titles. */}
+      <div style={{ padding: 'calc(env(safe-area-inset-top) + 10px) 16px 10px', borderBottom: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ fontFamily: serif, fontSize: 20, fontWeight: 700, letterSpacing: -0.2, lineHeight: 1, color: C.ink }}>HandBook</div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-          <IconBtn label={t('glossary')} onClick={onGlossary}><IcBook size={19} /></IconBtn>
-          <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={19} /></IconBtn>
+          <IconBtn label={t('glossary')} onClick={onGlossary}><IcBook size={18} /></IconBtn>
+          <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={18} /></IconBtn>
           <IconBtn label={connected ? t('accountSynced') : t('cloudSync')} onClick={onCloud}>
             <span style={{ position: 'relative', display: 'inline-flex' }}>
-              <IcCloud size={19} style={connected ? { color: C.accent } : undefined} />
+              <IcCloud size={18} style={connected ? { color: C.accent } : undefined} />
               {connected && (
                 <span style={{ position: 'absolute', right: -3, top: -2, width: 7, height: 7, borderRadius: '50%', background: C.accent, border: `1.5px solid ${C.surface}` }} />
               )}
             </span>
           </IconBtn>
-          <IconBtn label={t('settings')} onClick={onSettings}><IcSettings size={19} /></IconBtn>
+          <IconBtn label={t('settings')} onClick={onSettings}><IcSettings size={18} /></IconBtn>
         </div>
       </div>
-      <div style={{ fontSize: 13, color: C.sub, marginTop: 6 }}>{t('tagline')}</div>
-      {/* AI disclaimer only where questions are actually sent to the AI (Ask tab);
-          Vault and Rights keep the header compact so their content fits statically. */}
+      {/* Tagline + AI disclaimer belong to the Ask page (the home) - they act as
+          its intro. Vault and Rights open straight into their own titled content. */}
       {showDisclaimer && (
-        <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '9px 12px', margin: '13px 0 0', lineHeight: 1.5 }}>
-          {t('disclaimer')}
+        <div style={{ padding: '12px 16px 0' }}>
+          <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.5 }}>{t('tagline')}</div>
+          <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '9px 12px', margin: '10px 0 0', lineHeight: 1.5 }}>
+            {t('disclaimer')}
+          </div>
         </div>
       )}
     </div>
   )
+}
+
+// The one big headline on every page - pages own the hierarchy, the chrome
+// bar above stays small. Shared so Vault / Rights / future tabs never drift.
+function PageTitle({ children }) {
+  return <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: -0.3, color: C.ink, margin: '14px 2px 6px' }}>{children}</div>
 }
 
 // Bottom nav: Ask (left) · raised Vault button (center, opens the vault sheet) ·
@@ -2007,7 +2016,7 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
   const hasCodes = !!(pack && pack.serviceCodes && pack.serviceCodes.length)
   return (
     <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `10px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
-      <div style={{ fontFamily: serif, fontSize: 24, fontWeight: 700, margin: '6px 2px 4px' }}>{t('rtHubTitle')}</div>
+      <PageTitle>{t('rtHubTitle')}</PageTitle>
       <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('rtHubSub')}</div>
 
       {/* Featured public tool: the home/program self-check (no account needed). */}
@@ -3174,7 +3183,7 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
   if (!ready) {
     return (
       <Page>
-        <div style={{ fontFamily: serif, fontSize: 24, fontWeight: 700, margin: '6px 2px 4px' }}>{t('navVault')}</div>
+        <PageTitle>{t('navVault')}</PageTitle>
         <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: '16px 14px', margin: '12px 0 18px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
           <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
@@ -3192,7 +3201,7 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
   return (
     <>
       <Page>
-        <div style={{ fontFamily: serif, fontSize: 24, fontWeight: 700, margin: '6px 2px 4px' }}>{t('navVault')}</div>
+        <PageTitle>{t('navVault')}</PageTitle>
         <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('vaultHubSub')}</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setView('incidents')} />
