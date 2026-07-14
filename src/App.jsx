@@ -3465,6 +3465,11 @@ function AuthFlow({ cloud, intro }) {
   const [emailInput, setEmailInput] = useState(email || '')
   const [code, setCode] = useState('')
 
+  // Shared devices: signing out clears the account email, but this component
+  // stays mounted on the Vault page - so also blank the field, never leaving
+  // the previous person's address prefilled for the next one.
+  useEffect(() => { if (!email) setEmailInput('') }, [email])
+
   // Render a translated string containing {email} with the address bolded.
   const withEmail = (key) => {
     const [before, after] = t(key).split('{email}')
