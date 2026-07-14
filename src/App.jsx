@@ -3199,16 +3199,28 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
     )
   }
 
-  // Signed out or locked: just the sign-in prompt. The Vault is only login-gated
-  // personal records; public help lines live on the Rights tab.
+  // Signed out or locked. Two cases: a returning user whose account already has a
+  // PIN just unlocks right here (status 'need_pin' - no sheet to open, so daily
+  // use is one field); a brand-new user gets the pitch + Open Account, which
+  // runs the email step in the account sheet. Public help lives on the Rights tab.
   if (!ready) {
+    const lockCard = { background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: '16px 14px', margin: '0 0 18px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }
     return (
       <Page>
         <PageTitle>{t('navVault')}</PageTitle>
-        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: '16px 14px', margin: '12px 0 18px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
-          <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
-          <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
-        </div>
+        <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('vaultHubSub')}</div>
+        {cloud.status === 'need_pin' ? (
+          <div style={lockCard}>
+            <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{t('pinUnlockTitle')}</div>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>{cloud.pinMode === 'recover' ? t('pinRecoverSub') : t('pinUnlockSub')}</div>
+            <PinEntry cloud={cloud} />
+          </div>
+        ) : (
+          <div style={lockCard}>
+            <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
+            <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
+          </div>
+        )}
       </Page>
     )
   }
@@ -3414,12 +3426,43 @@ function CloudNote({ error }) {
   )
 }
 
+// Shared 4-digit PIN entry: the field + submit + sign-out, wired to the cloud
+// hook. Used both inline on the Vault page (a returning user unlocks without
+// opening the account sheet) and inside the account sheet's need_pin step. The
+// caller supplies the heading; the CTA follows pinMode (unlock/recover/setup).
+function PinEntry({ cloud }) {
+  const t = useT()
+  const { pinMode, error, busy } = cloud
+  const [pin, setPin] = useState('')
+  const cta = { setup: t('pinSetupCta'), unlock: t('pinUnlockCta'), recover: t('pinRecoverCta') }[pinMode] || t('pinUnlockCta')
+  return (
+    <>
+      <input
+        type="password" inputMode="numeric" autoComplete="off" placeholder="••••" maxLength={4}
+        value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+        onKeyDown={(e) => { if (e.key === 'Enter' && pin.length === 4) cloud.submitPin(pin) }}
+        style={{ ...inputStyle, fontSize: 22, letterSpacing: 10, textAlign: 'center' }}
+      />
+      <CloudNote error={error} />
+      <button
+        disabled={busy || pin.length !== 4}
+        onClick={() => cloud.submitPin(pin)}
+        style={{ ...cloudBtn('primary'), marginTop: 12, opacity: (busy || pin.length !== 4) ? 0.6 : 1 }}
+      >
+        {busy ? t('working') : cta}
+      </button>
+      <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>
+        {t('signOut')}
+      </button>
+    </>
+  )
+}
+
 function CloudSheet({ onClose, cloud }) {
   const t = useT()
   const { status, pinMode, email, error, busy } = cloud
   const [emailInput, setEmailInput] = useState(email || '')
   const [code, setCode] = useState('')
-  const [pin, setPin] = useState('')
 
   // When entering the PIN (or finishing setup) unlocks the vault, drop the user
   // straight back to the app instead of leaving this sheet open on the "ready"
@@ -3456,9 +3499,9 @@ function CloudSheet({ onClose, cloud }) {
   }
 
   const pinCopy = {
-    setup: { title: t('pinSetupTitle'), sub: t('pinSetupSub'), cta: t('pinSetupCta') },
-    unlock: { title: t('pinUnlockTitle'), sub: t('pinUnlockSub'), cta: t('pinUnlockCta') },
-    recover: { title: t('pinUnlockTitle'), sub: t('pinRecoverSub'), cta: t('pinRecoverCta') },
+    setup: { title: t('pinSetupTitle'), sub: t('pinSetupSub') },
+    unlock: { title: t('pinUnlockTitle'), sub: t('pinUnlockSub') },
+    recover: { title: t('pinUnlockTitle'), sub: t('pinRecoverSub') },
   }[pinMode] || {}
 
   return (
@@ -3511,23 +3554,7 @@ function CloudSheet({ onClose, cloud }) {
         <div>
           <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, marginBottom: 4 }}>{pinCopy.title}</div>
           <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>{pinCopy.sub}</div>
-          <input
-            type="password" inputMode="numeric" autoComplete="off" placeholder="••••" maxLength={4}
-            value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-            onKeyDown={(e) => { if (e.key === 'Enter' && pin.length === 4) cloud.submitPin(pin) }}
-            style={{ ...inputStyle, fontSize: 22, letterSpacing: 10, textAlign: 'center' }}
-          />
-          <CloudNote error={error} />
-          <button
-            disabled={busy || pin.length !== 4}
-            onClick={() => cloud.submitPin(pin)}
-            style={{ ...cloudBtn('primary'), marginTop: 12, opacity: (busy || pin.length !== 4) ? 0.6 : 1 }}
-          >
-            {busy ? t('working') : pinCopy.cta}
-          </button>
-          <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>
-            {t('signOut')}
-          </button>
+          <PinEntry cloud={cloud} />
         </div>
       )}
 
