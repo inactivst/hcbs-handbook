@@ -1235,14 +1235,13 @@ function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDis
           <IconBtn label={t('settings')} onClick={onSettings}><IcSettings size={18} /></IconBtn>
         </div>
       </div>
-      {/* Tagline + AI disclaimer belong to the Ask page (the home) - they act as
-          its intro. Vault and Rights open straight into their own titled content. */}
+      {/* Tagline belongs to the Ask page (the home) - it acts as its intro.
+          The fuller disclaimer (AI, privacy, storage) lives once in Settings'
+          About section, not duplicated here. Vault and Rights open straight
+          into their own titled content. */}
       {showDisclaimer && (
         <div style={{ padding: '12px 16px 0' }}>
           <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.5 }}>{t('tagline')}</div>
-          <div style={{ fontSize: 12, color: C.sub, background: C.accentSoft, border: `1px solid ${C.line}`, borderRadius: 10, padding: '9px 12px', margin: '10px 0 0', lineHeight: 1.5 }}>
-            {t('disclaimer')}
-          </div>
         </div>
       )}
     </div>
@@ -2016,7 +2015,7 @@ function WhereToStartSheet({ code, onClose }) {
 // sheet of plain-language, grouped guides. The public self-check stays featured.
 function Library({ stateCode, onStateChange, onSaveIncident }) {
   const t = useT()
-  const [view, setView] = useState(null) // null | 'state' | 'federal' | 'codes' | 'help' | 'others'
+  const [view, setView] = useState(null) // null | 'state' | 'federal' | 'codes' | 'others' | 'rc' | 'start'
   const [showCheck, setShowCheck] = useState(false)
   const name = stateName(stateCode)
   const covered = stateCovered(stateCode)
@@ -2048,18 +2047,23 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
       <HubHero icon={IcStar} title={t('rtYourStateCard', { name })} sub={covered ? t('rtYourStateSub') : t('rtYourStateSubBase')} onClick={() => setView('state')} />
       <HubHero icon={IcColumns} title={t('rtFederalCard')} sub={t('rtFederalSub2')} onClick={() => setView('federal')} />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
-        {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { name })} onClick={() => setView('codes')} />}
-        {/* Regional centers are a California (Lanterman Act) construct - CA only. */}
-        {stateCode === 'CA' && (
-          <VaultTile icon={<IcMap size={22} />} label={t('rtTileRc')} sub={t('rtTileRcSub')} onClick={() => setView('rc')} />
-        )}
-        {/* The regional-center equivalent for other big states (LIDDA, APD, OPWDD...). */}
-        {hasStateGuide(stateCode) && (
-          <VaultTile icon={<IcMap size={22} />} label={t('rtTileStart')} sub={t('rtTileStartSub')} onClick={() => setView('start')} />
-        )}
-        <VaultTile icon={<IcPhone size={22} />} label={t('rtTileHelp')} sub={t('rtTileHelpSub')} onClick={() => setView('help')} />
-      </div>
+      {/* Help & contacts (the advocacy/agency phone lines) live on the Vault tab,
+          not here - one home for them, no duplication. This grid holds only the
+          state-specific rights tools, so it's guarded to avoid an empty row when
+          a base state has neither service codes nor a regional-center guide. */}
+      {(hasCodes || stateCode === 'CA' || hasStateGuide(stateCode)) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
+          {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { name })} onClick={() => setView('codes')} />}
+          {/* Regional centers are a California (Lanterman Act) construct - CA only. */}
+          {stateCode === 'CA' && (
+            <VaultTile icon={<IcMap size={22} />} label={t('rtTileRc')} sub={t('rtTileRcSub')} onClick={() => setView('rc')} />
+          )}
+          {/* The regional-center equivalent for other big states (LIDDA, APD, OPWDD...). */}
+          {hasStateGuide(stateCode) && (
+            <VaultTile icon={<IcMap size={22} />} label={t('rtTileStart')} sub={t('rtTileStartSub')} onClick={() => setView('start')} />
+          )}
+        </div>
+      )}
 
       {/* Other states spans full width below the primary cards - every state gets the federal floor. */}
       <div style={{ marginTop: 12 }}>
@@ -2073,11 +2077,6 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
       {view === 'others' && <OtherStatesSheet currentCode={stateCode} onClose={() => setView(null)} />}
       {view === 'rc' && <RcSheet onClose={() => setView(null)} />}
       {view === 'start' && <WhereToStartSheet code={stateCode} onClose={() => setView(null)} />}
-      {view === 'help' && (
-        <Modal onClose={() => setView(null)} title={t('helpContacts')}>
-          <ContactsCard stateCode={stateCode} />
-        </Modal>
-      )}
     </div>
   )
 }
@@ -3219,7 +3218,6 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
           <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setView('packet')} />
           <VaultTile icon={<IcPhone size={22} />} label={t('helpContacts')} sub={t('tileContactsSub')} onClick={() => setView('contacts')} />
         </div>
-        <div style={{ fontSize: 12, color: C.sub, marginTop: 16, lineHeight: 1.5 }}>{t('vaultPrivacy')}</div>
       </Page>
 
       {view === 'incidents' && (
@@ -3342,8 +3340,6 @@ function SettingsSheet({ onClose, count, onDeleteAll, lang, onLangChange }) {
           {t('aboutBody1')}
           <br /><br />
           {t('aboutBody2')}
-          <br /><br />
-          {t('aboutBody3')}
         </div>
       </SheetSection>
     </Modal>
