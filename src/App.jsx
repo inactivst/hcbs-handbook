@@ -1234,13 +1234,14 @@ function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDis
           <IconBtn label={t('settings')} onClick={onSettings}><IcSettings size={18} /></IconBtn>
         </div>
       </div>
-      {/* Tagline belongs to the Ask page (the home) - it acts as its intro.
-          The fuller disclaimer (AI, privacy, storage) lives once in Settings'
-          About section, not duplicated here. Vault and Rights open straight
-          into their own titled content. */}
+      {/* The Ask page's own title + tagline, matching the serif PageTitle that
+          Vault and Rights show (same 10px top / 18px left, so all three line up
+          when you switch tabs). The fuller disclaimer (AI, privacy, storage)
+          lives once in Settings' About section, not duplicated here. */}
       {showDisclaimer && (
-        <div style={{ padding: '12px 16px 0' }}>
-          <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.5 }}>{t('tagline')}</div>
+        <div style={{ padding: '10px 16px 0' }}>
+          <PageTitle>{t('navAsk')}</PageTitle>
+          <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.5, margin: '0 2px' }}>{t('tagline')}</div>
         </div>
       )}
     </div>
@@ -1303,7 +1304,7 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
 function StateBar({ stateCode, onStateChange }) {
   const t = useT()
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 0', flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 0 18px', flexShrink: 0 }}>
       <span style={{ fontSize: 13, color: C.sub, flexShrink: 0 }}>{t('answeringFor')}</span>
       <div style={{ flex: 1, minWidth: 0, maxWidth: 240 }}>
         <Select
@@ -1370,7 +1371,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
       <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {indicator}
         <div ref={contentRef} style={{ ...contentStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '16px 16px 8px', WebkitOverflowScrolling: 'touch' }}>
+          <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '16px 16px 8px 18px', WebkitOverflowScrolling: 'touch' }}>
             {messages.length === 0 && (
               <div style={{ marginTop: 18 }}>
                 <div style={{ fontSize: 14, color: C.sub, marginBottom: 10 }}>{t('tryAsking')}</div>
