@@ -1240,7 +1240,7 @@ function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDis
           lives once in Settings' About section, not duplicated here. */}
       {showDisclaimer && (
         <div style={{ padding: '10px 16px 0' }}>
-          <PageTitle>{t('navAsk')}</PageTitle>
+          <PageTitle>{t('askTitle')}</PageTitle>
           <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.5, margin: '0 2px' }}>{t('tagline')}</div>
         </div>
       )}

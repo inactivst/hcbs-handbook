@@ -19,6 +19,7 @@ export const LANG_NAMES = { en: 'English', es: 'Spanish', tl: 'Tagalog' }
 
 const STRINGS = {
   en: {
+    askTitle: 'Ask a question',
     tagline: 'Your Home & Community-Based Services (HCBS) rights, in plain language',
     accountSynced: 'Account (synced)',
     cloudSync: 'Cloud sync',
@@ -395,6 +396,7 @@ const STRINGS = {
     lt_interpreter_body: 'I am requesting an interpreter and written materials in a format I can understand for meetings and notices about my services.\n\nPlease confirm this will be provided at no cost to me. My preferred language or format is below.',
   },
   es: {
+    askTitle: 'Haz una pregunta',
     tagline: 'Tus derechos de Servicios en el Hogar y la Comunidad (HCBS), en lenguaje sencillo',
     accountSynced: 'Cuenta (sincronizada)',
     cloudSync: 'Sincronización en la nube',
@@ -770,6 +772,7 @@ const STRINGS = {
     lt_interpreter_body: 'Solicito un intérprete y materiales escritos en un formato que pueda entender para las reuniones y los avisos sobre mis servicios.\n\nPor favor, confirmen que esto se proporcionará sin costo para mí. Mi idioma o formato preferido está abajo.',
   },
   tl: {
+    askTitle: 'Magtanong',
     tagline: 'Ang iyong mga karapatan sa Home and Community-Based Services (HCBS), sa simpleng wika',
     accountSynced: 'Account (naka-sync)',
     cloudSync: 'Cloud sync',
