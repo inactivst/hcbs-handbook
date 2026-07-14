@@ -2239,16 +2239,25 @@ function useVaultCollection(cloud, kind, sortFn) {
 }
 
 // Public help lines (CA focus; NDRN covers everywhere else). Numbers verified
-// against the fact-checked corpus + cdss.ca.gov - treat edits as content edits.
-// CA-specific help lines (numbers verified vs the corpus + dds.ca.gov). DDS is
-// the developmental-services agency behind HCBS; the CDSS line is only for the
-// Medi-Cal/IHSS track - both are listed so neither dominates.
+// against the fact-checked corpus + official .gov/.org sources - treat edits as
+// content edits, and NEVER add a number that hasn't been source-verified.
+// Ordered roughly advocacy -> agencies/finders -> appeals -> oversight/safety.
+// A contact may carry a phone AND a url (both render); DDS is the developmental-
+// services agency behind HCBS, the CDSS line is only the Medi-Cal/IHSS track.
+// Verified this session (2026-07-13): DRC intake 1-800-776-5746
+// (disabilityrightsca.org/get-help), SCDD toll-free 1-833-818-9886
+// (scdd.ca.gov/contactus), Medi-Cal Managed Care Ombudsman 1-888-452-8609
+// (dhcs.ca.gov), LTC Ombudsman CRISISline 1-800-231-4024 (aging.ca.gov).
 const CA_CONTACTS = [
   { name: 'OCRA', descKey: 'cOcra', phone: '1-800-390-7032' },
-  { name: 'CA Dept of Developmental Services', descKey: 'cDds', phone: '1-833-421-0061' },
-  { name: 'CDSS State Hearings', descKey: 'cCdss', phone: '1-800-743-8525' },
-  { name: 'Adult Protective Services', descKey: 'cAps', phone: '1-833-401-0832' },
+  { name: 'Disability Rights California', descKey: 'cDrc', phone: '1-800-776-5746', url: 'disabilityrightsca.org' },
+  { name: 'CA Dept of Developmental Services', descKey: 'cDds', phone: '1-833-421-0061', url: 'dds.ca.gov' },
   { name: 'Regional centers', descKey: 'cRc', url: 'dds.ca.gov/rc' },
+  { name: 'State Council on Developmental Disabilities', descKey: 'cScdd', phone: '1-833-818-9886', url: 'scdd.ca.gov' },
+  { name: 'CDSS State Hearings', descKey: 'cCdss', phone: '1-800-743-8525' },
+  { name: 'Medi-Cal Managed Care Ombudsman', descKey: 'cMcop', phone: '1-888-452-8609' },
+  { name: 'Long-Term Care Ombudsman', descKey: 'cLtco', phone: '1-800-231-4024' },
+  { name: 'Adult Protective Services', descKey: 'cAps', phone: '1-833-401-0832' },
 ]
 // Correct in every state - the honest fallback where we don't have that
 // state's agencies structured (HCBS is state-run; we never invent numbers).
@@ -3026,25 +3035,25 @@ function ContactsCard({ stateCode }) {
     : guide
       ? [...guide.contacts, ...UNIVERSAL_CONTACTS]
       : UNIVERSAL_CONTACTS
+  // Covered states (CA + guide states) jump straight into their verified list -
+  // the "Help & contacts" title already says what this is. Uncovered states get
+  // the note that points them at the Rights tab for their own agencies.
+  const linkStyle = { fontSize: 14, fontWeight: 600, color: C.accent, textDecoration: 'none' }
   return (
     <>
-      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>
-        {code === 'CA' || guide ? t('contactsSub') : t('contactsNote')}
-      </div>
+      {!(code === 'CA' || guide) && (
+        <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>{t('contactsNote')}</div>
+      )}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '6px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
         {list.map((c, i) => (
           <div key={c.name} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.name}</div>
             <div style={{ fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 1.5 }}>{c.descKey ? t(c.descKey) : c.desc}</div>
-            {c.phone ? (
-              <a href={telHref(c.phone)} style={{ fontSize: 14, fontWeight: 600, color: C.accent, textDecoration: 'none', marginTop: 3, display: 'inline-block' }}>
-                {c.phone}
-              </a>
-            ) : (
-              <a href={`https://${c.url}`} target="_blank" rel="noreferrer" style={{ fontSize: 14, fontWeight: 600, color: C.accent, textDecoration: 'none', marginTop: 3, display: 'inline-block' }}>
-                {c.url}
-              </a>
-            )}
+            {/* A contact may have a phone and/or a website; show each it has. */}
+            <div style={{ marginTop: 3, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+              {c.phone && <a href={telHref(c.phone)} style={linkStyle}>{c.phone}</a>}
+              {c.url && <a href={`https://${c.url}`} target="_blank" rel="noreferrer" style={linkStyle}>{c.url}</a>}
+            </div>
           </div>
         ))}
       </div>
