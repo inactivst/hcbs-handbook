@@ -1,5 +1,5 @@
-// ─── HandBook optional cloud account (email code → PIN → E2E vault) ──────────
-// HandBook works fully WITHOUT an account. Signing in only ADDS a feature:
+// ─── RightsBook optional cloud account (email code → PIN → E2E vault) ───────
+// RightsBook works fully WITHOUT an account. Signing in only ADDS a feature:
 // conversation history kept indefinitely, end-to-end encrypted, across devices.
 // The server only ever sees ciphertext; the vault key is wrapped by the user's
 // PIN and stored in `profiles`, so a new device recovers with email code + PIN.
@@ -13,7 +13,7 @@ import {
   localPin, localSalt, localEmail,
 } from './vault.js'
 
-const APP_TYPE = 'hcbs-handbook'
+const APP_TYPE = 'rightsbook'
 const isUuid = (s) => typeof s === 'string' &&
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
 
@@ -21,8 +21,23 @@ const isUuid = (s) => typeof s === 'string' &&
 // for the PIN again. Seconds; '-1' = never, '0' = immediately on hide.
 // (Matches the Book/GuestBook lock-delay model.) Default: never (no surprise
 // lock-outs for users who may find repeated PIN entry hard).
-const LOCK_DELAY_KEY = 'handbook-lock-delay'
-const HIDE_TS_KEY = 'handbook-hide-ts' // sessionStorage: when the app was last hidden
+const LOCK_DELAY_KEY = 'rightsbook-lock-delay'
+const HIDE_TS_KEY = 'rightsbook-hide-ts' // sessionStorage: when the app was last hidden
+
+// One-time migration from the pre-rebrand "handbook-*" key names. Copies the old
+// value forward if the new key is still empty; never deletes the old key.
+try {
+  if (localStorage.getItem(LOCK_DELAY_KEY) === null) {
+    const old = localStorage.getItem('handbook-lock-delay')
+    if (old !== null) localStorage.setItem(LOCK_DELAY_KEY, old)
+  }
+} catch { /* no-op */ }
+try {
+  if (sessionStorage.getItem(HIDE_TS_KEY) === null) {
+    const old = sessionStorage.getItem('handbook-hide-ts')
+    if (old !== null) sessionStorage.setItem(HIDE_TS_KEY, old)
+  }
+} catch { /* no-op */ }
 
 // The wrapped vault key is a { iv, data } object, but the profiles.encrypted_vault_key
 // column is TEXT, so it round-trips through the DB as a JSON string. Normalize on

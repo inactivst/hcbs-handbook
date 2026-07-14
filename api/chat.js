@@ -1,4 +1,4 @@
-// HandBook chat endpoint. Privacy model: no accounts, no storage, no logging of
+// RightsBook chat endpoint. Privacy model: no accounts, no storage, no logging of
 // message content. Each request carries the (client-held) conversation and is
 // answered from the public HCBS corpus - nothing is persisted server-side.
 // Explicit .js extension on the relative import: Vercel api/ functions are
@@ -47,13 +47,13 @@ const GROK_MODEL = process.env.XAI_MODEL || 'grok-4.3'
 const XAI_URL = 'https://api.x.ai/v1/chat/completions'
 const OPENAI_COMPAT_TIMEOUT_MS = 20000
 
-const STATIC_SYSTEM = `You are HandBook, a plain-language guide to Home and Community-Based Services (HCBS) rights for people in the United States. You answer for one U.S. state at a time; the current state and the rules that apply there are given below.
+const STATIC_SYSTEM = `You are RightsBook, a plain-language guide to Home and Community-Based Services (HCBS) rights for people in the United States. You answer for one U.S. state at a time; the current state and the rules that apply there are given below.
 
 Audience: people receiving services, their families, and direct support staff. Many readers use screen readers or read at a basic level. Write warmly and simply. Short paragraphs. Avoid legal jargon unless you immediately explain it.
 
 Rules:
 - Answer for the current state named below, using the federal HCBS rules and that state's excerpts. If the person asks about a different state, tell them to switch the state selector to that state so you can answer accurately, instead of guessing.
-- Some questions include Program guidance: short answers written and vetted by the HandBook team that capture local nuance. When a Program guidance entry addresses the question, lead with it and treat it as trusted and correct. Still cite the underlying law where relevant. When no Program guidance is provided, answer from the reference excerpts as usual.
+- Some questions include Program guidance: short answers written and vetted by the RightsBook team that capture local nuance. When a Program guidance entry addresses the question, lead with it and treat it as trusted and correct. Still cite the underlying law where relevant. When no Program guidance is provided, answer from the reference excerpts as usual.
 - Ground every answer in the reference excerpts provided below. Cite the source in parentheses, e.g. (42 CFR 441.301(c)(4)(vi)(C)) or (WIC 4731), when you state a right or requirement.
 - If the excerpts do not cover the question, say so honestly and point the person to their state's Medicaid or developmental-disabilities agency, their local Protection and Advocacy office, and any contact listed in the excerpts. Never invent regulations, code numbers, deadlines, agencies, or phone numbers.
 - If an excerpt itself flags conflicting information (for example, two different deadlines depending on the source), say so plainly and mention both figures rather than picking one with false confidence. Point the person to their own notice or the state agency for the exact number.
@@ -276,11 +276,11 @@ export default async function handler(req, res) {
   // state's specifics or only the federal baseline (never guess state details).
   let stateFraming = content.covered
     ? `Current state: ${content.name}. Answer for ${content.name}, using the federal HCBS rules and the ${content.name} excerpts below.`
-    : `Current state: ${content.name}. HandBook does NOT yet have ${content.name}-specific content loaded. Answer only from the federal HCBS baseline below, say plainly that the ${content.name} specifics are not loaded yet, and tell the person to confirm with ${content.name}'s Medicaid or developmental-disabilities agency and their local Protection and Advocacy office. Do not state ${content.name} statutes, agency names, deadlines, or phone numbers.`
+    : `Current state: ${content.name}. RightsBook does NOT yet have ${content.name}-specific content loaded. Answer only from the federal HCBS baseline below, say plainly that the ${content.name} specifics are not loaded yet, and tell the person to confirm with ${content.name}'s Medicaid or developmental-disabilities agency and their local Protection and Advocacy office. Do not state ${content.name} statutes, agency names, deadlines, or phone numbers.`
   if (compareContent) {
     stateFraming = compareContent.covered
       ? `The person already received the ${content.name} answer shown in the conversation. Now explain how ${compareContent.name} would answer the SAME question, using only the [${compareContent.name}] excerpts and the federal rules. Lead with what is actually different in ${compareContent.name} (agencies, plan names, deadlines, processes); then briefly note what stays the same because the federal floor applies everywhere. Do not repeat the whole ${content.name} answer. Keep it to 1-2 short paragraphs.`
-      : `The person already received the ${content.name} answer shown in the conversation and wants to know how ${compareContent.name} compares. HandBook does NOT yet have ${compareContent.name}-specific content loaded. Say that plainly, explain that the federal HCBS baseline (the same floor as ${content.name}) applies in ${compareContent.name} too, and refer them to ${compareContent.name}'s Medicaid or developmental-disabilities agency and their local Protection and Advocacy office. Do not state ${compareContent.name} statutes, agency names, deadlines, or phone numbers. Keep it to one short paragraph.`
+      : `The person already received the ${content.name} answer shown in the conversation and wants to know how ${compareContent.name} compares. RightsBook does NOT yet have ${compareContent.name}-specific content loaded. Say that plainly, explain that the federal HCBS baseline (the same floor as ${content.name}) applies in ${compareContent.name} too, and refer them to ${compareContent.name}'s Medicaid or developmental-disabilities agency and their local Protection and Advocacy office. Do not state ${compareContent.name} statutes, agency names, deadlines, or phone numbers. Keep it to one short paragraph.`
   }
 
   // California has two distinct appeal systems that a smaller model tends to
@@ -294,7 +294,7 @@ export default async function handler(req, res) {
   // Team playbook: vetted answers that outrank the raw regs when they match.
   const guidance = matchPlaybook(lastUser + ' ' + (prevUser ? prevUser.content : ''), PLAYBOOK)
   const guidanceBlock = guidance.length
-    ? 'Program guidance (written and vetted by the HandBook team - lead with this when it answers the question):\n\n' +
+    ? 'Program guidance (written and vetted by the RightsBook team - lead with this when it answers the question):\n\n' +
       guidance.map((g) => `- ${g.a}`).join('\n\n') + '\n\n'
     : ''
 
@@ -323,7 +323,7 @@ export default async function handler(req, res) {
       return
     } catch (err) {
       const status = err?.status ?? err?.response?.status
-      console.error(`HandBook ${name} error:`, err?.message || err, status)
+      console.error(`RightsBook ${name} error:`, err?.message || err, status)
       errors.push({ name, status })
       // continue to the next provider
     }
@@ -334,7 +334,7 @@ export default async function handler(req, res) {
   const allRateLimited = errors.length > 0 && errors.every((e) => e.status === 429)
   res.status(allRateLimited ? 429 : 500).json({
     error: allRateLimited
-      ? 'HandBook is busy right now. Please try again in a moment.'
+      ? 'RightsBook is busy right now. Please try again in a moment.'
       : 'Something went wrong answering that. Please try again.',
   })
 }

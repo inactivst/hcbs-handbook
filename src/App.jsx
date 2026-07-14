@@ -14,12 +14,26 @@ const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
 // to a server, never shared. Keeps the privacy posture: the app stores nothing
 // server-side. Capped so storage can't grow without bound (code-for-scale).
 // (Future accounts will keep history indefinitely in the cloud; local stays capped.)
-const STORE_KEY = 'handbook.conversations.v1'
+const STORE_KEY = 'rightsbook.conversations.v1'
 const MAX_CONVERSATIONS = 50
 
 // The user's chosen state grounds every answer and the Rights page. Empty until
 // the first-launch prompt is answered; persisted on this device like history.
-const STATE_KEY = 'handbook.state.v1'
+const STATE_KEY = 'rightsbook.state.v1'
+
+// One-time migration from the pre-rebrand "handbook.*" key names. Copies the old
+// value forward if the new key is still empty; never deletes the old key, so it
+// stays as a safe fallback.
+const migrateLocalKey = (oldKey, newKey) => {
+  try {
+    if (localStorage.getItem(newKey) === null) {
+      const old = localStorage.getItem(oldKey)
+      if (old !== null) localStorage.setItem(newKey, old)
+    }
+  } catch { /* no-op */ }
+}
+migrateLocalKey('handbook.conversations.v1', STORE_KEY)
+migrateLocalKey('handbook.state.v1', STATE_KEY)
 
 const STATE_OPTIONS = Object.entries(US_STATES).map(([value, label]) => ({ value, label }))
 const stateName = (code) => US_STATES[code] || code
@@ -1223,7 +1237,7 @@ function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDis
           so it reads as chrome. Each page's own serif title is the only big
           headline below it - the wordmark never competes with page titles. */}
       <div style={{ padding: 'calc(env(safe-area-inset-top) + 10px) 16px 10px', borderBottom: `1px solid ${C.line}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-        <div style={{ fontFamily: serif, fontSize: 20, fontWeight: 700, letterSpacing: -0.2, lineHeight: 1, color: C.ink }}>HandBook</div>
+        <div style={{ fontFamily: serif, fontSize: 20, fontWeight: 700, letterSpacing: -0.2, lineHeight: 1, color: C.ink }}>RightsBook</div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {onGlossary && <IconBtn label={t('glossary')} onClick={onGlossary}><IcBook size={18} /></IconBtn>}
           {onHistory && <IconBtn label={t('navHistory')} onClick={onHistory}><IcHistory size={18} /></IconBtn>}

@@ -1,8 +1,8 @@
-# HandBook - HCBS Rights Guide
+# RightsBook - HCBS Rights Guide
 
 Plain-language chat guide to HCBS (Home and Community-Based Services) rights, focused on California's regional center system. Vite + React front end, one Vercel serverless function grounded in a bundled corpus of public regulations (42 CFR 441.301, Lanterman Act, CA DDS service codes).
 
-**Models:** multiple providers with automatic failover. The primary answers each request; if it errors or is rate-limited (HTTP 429), the endpoint falls over to the next provider, so a throttled free tier no longer surfaces "HandBook is busy". Each provider only joins the chain when its key is set.
+**Models:** multiple providers with automatic failover. The primary answers each request; if it errors or is rate-limited (HTTP 429), the endpoint falls over to the next provider, so a throttled free tier no longer surfaces "RightsBook is busy". Each provider only joins the chain when its key is set.
 
 - **Groq** (`GROQ_API_KEY`) is the recommended **free** primary: the inference company Groq (with a Q), NOT xAI's Grok. Free tier, no credit card, ~1,000 req/day on `llama-3.3-70b-versatile` (set `GROQ_MODEL=llama-3.1-8b-instant` for 14,400/day). Key at console.groq.com.
 - **Cerebras** (`CEREBRAS_API_KEY`) is the **free** deep fallback: no card, 1M tokens/day but only 5 req/min - it backstops volume, never leads. `CEREBRAS_MODEL` default `gpt-oss-120b`. Key at cloud.cerebras.ai.
@@ -14,7 +14,7 @@ Plain-language chat guide to HCBS (Home and Community-Based Services) rights, fo
 The app was originally built and tested on `claude-opus-4-8` / `claude-haiku-4-5` via the Anthropic API; Claude can be dropped into the same provider map in `api/chat.js` (re-add `@anthropic-ai/sdk` and add a `callClaude` alongside the others).
 
 ## Privacy model
-- **The chat endpoint is stateless.** Questions are sent to the model to answer and are not stored or logged on any HandBook server. The in-app disclaimer tells users to leave names and other personal details out of questions.
+- **The chat endpoint is stateless.** Questions are sent to the model to answer and are not stored or logged on any RightsBook server. The in-app disclaimer tells users to leave names and other personal details out of questions.
 - **Without an account**, saved history lives only in the browser (localStorage) on that device.
 - **With an optional account** (email OTP + PIN), history and the Vault sync to Supabase **end-to-end encrypted**: the vault key is generated on the device and wrapped by a PBKDF2 key derived from the PIN, so the server stores only ciphertext and can never read the contents (see `src/vault.js`). The tradeoff is that a forgotten PIN cannot be recovered - there is no server-side key.
 - All built-in knowledge content is public regulation.

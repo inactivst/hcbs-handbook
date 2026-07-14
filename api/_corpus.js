@@ -1,4 +1,4 @@
-// HandBook knowledge corpus. Underscore prefix = not exposed as an API route.
+// RightsBook knowledge corpus. Underscore prefix = not exposed as an API route.
 // All content is public regulation/statute. No PII lives anywhere in this app.
 // Sources: 42 CFR 441.301 (HCBS Settings Final Rule), CA Lanterman Act (WIC 4500 et seq.),
 // CA DDS published service code lists.

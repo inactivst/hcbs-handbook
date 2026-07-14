@@ -1,6 +1,6 @@
 # State pack drafts - team vetting queue
 
-These are AI-drafted state content packs for HandBook's multi-state feature.
+These are AI-drafted state content packs for RightsBook's multi-state feature.
 **Nothing in this folder is live.** The app only answers with state specifics
 for states listed in `api/_corpus.js` `STATES` (currently CA only); everyone
 else gets the federal baseline plus a referral.

@@ -6,7 +6,7 @@
 // never renders blank UI.
 import { createContext, useContext } from 'react'
 
-export const LANG_KEY = 'handbook.lang.v1'
+export const LANG_KEY = 'rightsbook.lang.v1'
 
 export const LANG_OPTIONS = [
   { value: 'en', label: 'English' },
@@ -97,7 +97,7 @@ const STRINGS = {
     rtFederalTitle: 'Federal rights',
     rtFederalIntro: 'These rights apply in every U.S. state. They are the floor your state builds on.',
     rtStateTitle: '{name} rights',
-    rtStateIntro: 'What HandBook has for {name}. Federal rights live on their own card.',
+    rtStateIntro: 'What RightsBook has for {name}. Federal rights live on their own card.',
     rtOthersTitle: 'Other states',
     rtOthersIntro: 'Every state gets the federal rights. State guides are added as the team vets them.',
     rtAllStates: 'All states',
@@ -144,8 +144,8 @@ const STRINGS = {
     tapAgainDelete: 'Tap again to delete everything',
     deleteAll: 'Delete all saved questions',
     about: 'About',
-    aboutBody1: "HandBook explains Home and Community-Based Services (HCBS) rights in plain language, grounded in the federal Settings Rule and California's Lanterman Act. It offers general information, not legal advice.",
-    aboutBody2: "Questions you ask are answered by an AI model and are not stored on any HandBook server, so please leave out names and other personal details. Without an account, your saved questions stay on this device. When you sign in, your history and Vault are end-to-end encrypted, so only you can read them.",
+    aboutBody1: "RightsBook explains Home and Community-Based Services (HCBS) rights in plain language, grounded in the federal Settings Rule and California's Lanterman Act. It offers general information, not legal advice.",
+    aboutBody2: "Questions you ask are answered by an AI model and are not stored on any RightsBook server, so please leave out names and other personal details. Without an account, your saved questions stay on this device. When you sign in, your history and Vault are end-to-end encrypted, so only you can read them.",
     whereLive: 'Where do you live?',
     whereLiveBody: 'HCBS rights start with the same federal rules everywhere, but each state runs its own program. Pick your state so answers fit where you live. You can change it anytime.',
     chooseState: 'Choose your state…',
@@ -153,10 +153,10 @@ const STRINGS = {
     skipUseCA: 'Skip - use California',
     account: 'Account',
     notConnected: 'Not connected',
-    offBody1: 'HandBook works fully on this device without an account - nothing you do here requires one.',
+    offBody1: 'RightsBook works fully on this device without an account - nothing you do here requires one.',
     offBody2: 'Optional accounts are coming soon. Signing in will keep your saved questions indefinitely across devices - and everything stays private to you.',
     signInBody: 'Sign in to keep your saved questions indefinitely and across devices. Everything is end-to-end encrypted - private to you.',
-    signInSub: 'HandBook works fully without an account; this only adds cloud history.',
+    signInSub: 'RightsBook works fully without an account; this only adds cloud history.',
     email: 'Email',
     sending: 'Sending…',
     emailMeCode: 'Email me a code',
@@ -219,7 +219,7 @@ const STRINGS = {
     incNeedWhat: 'Describe what happened first.',
     // Appeal deadlines
     appealDeadlines: 'Appeal deadlines',
-    deadlineSub: 'Enter the date on the denial notice you received and HandBook tracks how long you have left to appeal.',
+    deadlineSub: 'Enter the date on the denial notice you received and RightsBook tracks how long you have left to appeal.',
     addDeadline: 'Add denial notice',
     editDeadline: 'Denial notice',
     dlNotice: 'Date on the notice',
@@ -272,7 +272,7 @@ const STRINGS = {
     packetFileCA: "File this with your regional center director and keep a copy. For free help, contact the Office of Clients' Rights Advocacy (OCRA) at 1-800-390-7032.",
     packetFileGeneric: 'File this through your provider or state grievance process and keep a copy. For free help, find your Protection & Advocacy office at ndrn.org.',
     packetPrint: 'Print / Save as PDF',
-    packetFooter: 'Prepared with HandBook. General information, not legal advice.',
+    packetFooter: 'Prepared with RightsBook. General information, not legal advice.',
     packetOpenFailed: 'Could not open the packet. Please allow pop-ups and try again.',
     // Documents & photos
     docsTitle: 'Documents & photos',
@@ -324,7 +324,7 @@ const STRINGS = {
     hcResultsIntro: 'You flagged {n} area(s) that may need a closer look. Here is your right and what to ask for.',
     hcYourRight: 'Your right',
     hcAskFor: 'Ask for',
-    hcNext: 'What you can do next: bring this to your next plan (IPP) meeting, share it with an advocate, or use it to start a complaint. HandBook can help you write a letter or a complaint packet.',
+    hcNext: 'What you can do next: bring this to your next plan (IPP) meeting, share it with an advocate, or use it to start a complaint. RightsBook can help you write a letter or a complaint packet.',
     hcOpenSummary: 'Open printable summary',
     hcSaveIncident: 'Save to my incident log',
     hcSaved: 'Saved to your incident log',
@@ -473,7 +473,7 @@ const STRINGS = {
     rtFederalTitle: 'Derechos federales',
     rtFederalIntro: 'Estos derechos aplican en todos los estados de EE. UU. Son la base sobre la que tu estado construye.',
     rtStateTitle: 'Derechos en {name}',
-    rtStateIntro: 'Lo que HandBook tiene para {name}. Los derechos federales están en su propia tarjeta.',
+    rtStateIntro: 'Lo que RightsBook tiene para {name}. Los derechos federales están en su propia tarjeta.',
     rtOthersTitle: 'Otros estados',
     rtOthersIntro: 'Todos los estados tienen los derechos federales. Las guías estatales se agregan cuando el equipo las revisa.',
     rtAllStates: 'Todos los estados',
@@ -520,8 +520,8 @@ const STRINGS = {
     tapAgainDelete: 'Toca otra vez para borrar todo',
     deleteAll: 'Eliminar todas las preguntas guardadas',
     about: 'Acerca de',
-    aboutBody1: 'HandBook explica los derechos de los Servicios en el Hogar y la Comunidad (HCBS) en lenguaje sencillo, con base en la Regla federal de Entornos y la Ley Lanterman de California. Ofrece información general, no asesoría legal.',
-    aboutBody2: 'Las preguntas que haces las responde un modelo de inteligencia artificial y no se guardan en ningún servidor de HandBook, así que por favor no incluyas nombres ni otros datos personales. Sin una cuenta, tus preguntas guardadas se quedan en este dispositivo. Cuando inicias sesión, tu historial y tu Bóveda están cifrados de extremo a extremo, para que solo tú puedas leerlos.',
+    aboutBody1: 'RightsBook explica los derechos de los Servicios en el Hogar y la Comunidad (HCBS) en lenguaje sencillo, con base en la Regla federal de Entornos y la Ley Lanterman de California. Ofrece información general, no asesoría legal.',
+    aboutBody2: 'Las preguntas que haces las responde un modelo de inteligencia artificial y no se guardan en ningún servidor de RightsBook, así que por favor no incluyas nombres ni otros datos personales. Sin una cuenta, tus preguntas guardadas se quedan en este dispositivo. Cuando inicias sesión, tu historial y tu Bóveda están cifrados de extremo a extremo, para que solo tú puedas leerlos.',
     whereLive: '¿Dónde vives?',
     whereLiveBody: 'Los derechos de HCBS empiezan con las mismas reglas federales en todas partes, pero cada estado maneja su propio programa. Elige tu estado para que las respuestas correspondan a donde vives. Puedes cambiarlo cuando quieras.',
     chooseState: 'Elige tu estado…',
@@ -529,10 +529,10 @@ const STRINGS = {
     skipUseCA: 'Omitir: usar California',
     account: 'Cuenta',
     notConnected: 'No conectado',
-    offBody1: 'HandBook funciona completamente en este dispositivo sin una cuenta; nada de lo que hagas aquí requiere una.',
+    offBody1: 'RightsBook funciona completamente en este dispositivo sin una cuenta; nada de lo que hagas aquí requiere una.',
     offBody2: 'Las cuentas opcionales llegan pronto. Al iniciar sesión, tus preguntas guardadas se conservarán indefinidamente en todos tus dispositivos, y todo se mantiene privado para ti.',
     signInBody: 'Inicia sesión para conservar tus preguntas guardadas indefinidamente y en todos tus dispositivos. Todo está cifrado de extremo a extremo: privado para ti.',
-    signInSub: 'HandBook funciona completamente sin una cuenta; esto solo agrega historial en la nube.',
+    signInSub: 'RightsBook funciona completamente sin una cuenta; esto solo agrega historial en la nube.',
     email: 'Correo electrónico',
     sending: 'Enviando…',
     emailMeCode: 'Envíame un código',
@@ -594,7 +594,7 @@ const STRINGS = {
     incNeedWhat: 'Primero describe lo que pasó.',
     // Appeal deadlines
     appealDeadlines: 'Plazos de apelación',
-    deadlineSub: 'Ingresa la fecha del aviso de negación que recibiste y HandBook lleva la cuenta de cuánto tiempo te queda para apelar.',
+    deadlineSub: 'Ingresa la fecha del aviso de negación que recibiste y RightsBook lleva la cuenta de cuánto tiempo te queda para apelar.',
     addDeadline: 'Agregar aviso de negación',
     editDeadline: 'Aviso de negación',
     dlNotice: 'Fecha del aviso',
@@ -647,7 +647,7 @@ const STRINGS = {
     packetFileCA: 'Presenta esto ante el director de tu centro regional y guarda una copia. Para ayuda gratuita, contacta a la Oficina de Defensa de los Derechos de los Clientes (OCRA) al 1-800-390-7032.',
     packetFileGeneric: 'Presenta esto a través del proceso de queja de tu proveedor o estado y guarda una copia. Para ayuda gratuita, encuentra tu oficina de Protección y Defensa en ndrn.org.',
     packetPrint: 'Imprimir / Guardar como PDF',
-    packetFooter: 'Preparado con HandBook. Información general, no asesoría legal.',
+    packetFooter: 'Preparado con RightsBook. Información general, no asesoría legal.',
     packetOpenFailed: 'No se pudo abrir el paquete. Permite las ventanas emergentes e intenta de nuevo.',
     // Documents & photos
     docsTitle: 'Documentos y fotos',
@@ -699,7 +699,7 @@ const STRINGS = {
     hcResultsIntro: 'Marcaste {n} área(s) que podrían necesitar una mirada más de cerca. Aquí está tu derecho y qué pedir.',
     hcYourRight: 'Tu derecho',
     hcAskFor: 'Pide',
-    hcNext: 'Qué puedes hacer después: lleva esto a tu próxima reunión de plan (IPP), compártelo con un defensor, o úsalo para iniciar una queja. HandBook puede ayudarte a escribir una carta o un paquete de queja.',
+    hcNext: 'Qué puedes hacer después: lleva esto a tu próxima reunión de plan (IPP), compártelo con un defensor, o úsalo para iniciar una queja. RightsBook puede ayudarte a escribir una carta o un paquete de queja.',
     hcOpenSummary: 'Abrir resumen para imprimir',
     hcSaveIncident: 'Guardar en mi registro de incidentes',
     hcSaved: 'Guardado en tu registro de incidentes',
@@ -848,7 +848,7 @@ const STRINGS = {
     rtFederalTitle: 'Mga karapatang federal',
     rtFederalIntro: 'Umiiral ang mga karapatang ito sa bawat estado ng U.S. Ito ang pundasyong pinagbabatayan ng iyong estado.',
     rtStateTitle: 'Mga karapatan sa {name}',
-    rtStateIntro: 'Ang mayroon ang HandBook para sa {name}. Ang mga karapatang federal ay nasa sarili nilang card.',
+    rtStateIntro: 'Ang mayroon ang RightsBook para sa {name}. Ang mga karapatang federal ay nasa sarili nilang card.',
     rtOthersTitle: 'Ibang mga estado',
     rtOthersIntro: 'Lahat ng estado ay may mga karapatang federal. Idinadagdag ang mga gabay ng estado kapag nasuri na ng team.',
     rtAllStates: 'Lahat ng estado',
@@ -895,8 +895,8 @@ const STRINGS = {
     tapAgainDelete: 'Pindutin ulit para burahin lahat',
     deleteAll: 'Burahin lahat ng naka-save na tanong',
     about: 'Tungkol dito',
-    aboutBody1: 'Ipinapaliwanag ng HandBook ang mga karapatan sa Home and Community-Based Services (HCBS) sa simpleng wika, batay sa federal na Settings Rule at sa Lanterman Act ng California. Nagbibigay ito ng pangkalahatang impormasyon, hindi legal na payo.',
-    aboutBody2: 'Ang mga tanong mo ay sinasagot ng isang AI model at hindi iniimbak sa anumang server ng HandBook, kaya huwag maglagay ng mga pangalan o iba pang personal na detalye. Kung walang account, ang naka-save mong mga tanong ay nananatili sa device na ito. Kapag naka-sign in ka, ang iyong history at Vault ay end-to-end encrypted, para ikaw lang ang makakabasa nito.',
+    aboutBody1: 'Ipinapaliwanag ng RightsBook ang mga karapatan sa Home and Community-Based Services (HCBS) sa simpleng wika, batay sa federal na Settings Rule at sa Lanterman Act ng California. Nagbibigay ito ng pangkalahatang impormasyon, hindi legal na payo.',
+    aboutBody2: 'Ang mga tanong mo ay sinasagot ng isang AI model at hindi iniimbak sa anumang server ng RightsBook, kaya huwag maglagay ng mga pangalan o iba pang personal na detalye. Kung walang account, ang naka-save mong mga tanong ay nananatili sa device na ito. Kapag naka-sign in ka, ang iyong history at Vault ay end-to-end encrypted, para ikaw lang ang makakabasa nito.',
     whereLive: 'Saan ka nakatira?',
     whereLiveBody: 'Ang mga karapatan sa HCBS ay nagsisimula sa parehong federal na patakaran kahit saan, pero bawat estado ay may sariling programa. Piliin ang iyong estado para tumugma ang mga sagot sa tinitirhan mo. Puwede mo itong baguhin anumang oras.',
     chooseState: 'Piliin ang iyong estado…',
@@ -904,10 +904,10 @@ const STRINGS = {
     skipUseCA: 'Laktawan: gamitin ang California',
     account: 'Account',
     notConnected: 'Hindi nakakonekta',
-    offBody1: 'Gumagana nang buo ang HandBook sa device na ito nang walang account; walang ginagawa rito na nangangailangan nito.',
+    offBody1: 'Gumagana nang buo ang RightsBook sa device na ito nang walang account; walang ginagawa rito na nangangailangan nito.',
     offBody2: 'Malapit nang dumating ang opsyonal na mga account. Sa pag-sign in, mananatili ang iyong mga naka-save na tanong nang walang taning sa lahat ng device, at lahat ay nananatiling pribado para sa iyo.',
     signInBody: 'Mag-sign in para mapanatili ang iyong mga naka-save na tanong nang walang taning at sa lahat ng device. Lahat ay end-to-end encrypted: pribado para sa iyo.',
-    signInSub: 'Gumagana nang buo ang HandBook nang walang account; nagdadagdag lang ito ng cloud history.',
+    signInSub: 'Gumagana nang buo ang RightsBook nang walang account; nagdadagdag lang ito ng cloud history.',
     email: 'Email',
     sending: 'Ipinapadala…',
     emailMeCode: 'Padalhan ako ng code',
@@ -969,7 +969,7 @@ const STRINGS = {
     incNeedWhat: 'Ilarawan muna ang nangyari.',
     // Appeal deadlines
     appealDeadlines: 'Mga deadline ng apela',
-    deadlineSub: 'Ilagay ang petsa sa notice ng pagtanggi na natanggap mo at susubaybayan ng HandBook kung gaano katagal ka pang makakapag-apela.',
+    deadlineSub: 'Ilagay ang petsa sa notice ng pagtanggi na natanggap mo at susubaybayan ng RightsBook kung gaano katagal ka pang makakapag-apela.',
     addDeadline: 'Magdagdag ng notice ng pagtanggi',
     editDeadline: 'Notice ng pagtanggi',
     dlNotice: 'Petsa sa notice',
@@ -1022,7 +1022,7 @@ const STRINGS = {
     packetFileCA: 'I-file ito sa director ng iyong regional center at mag-itago ng kopya. Para sa libreng tulong, kontakin ang Office of Clients\' Rights Advocacy (OCRA) sa 1-800-390-7032.',
     packetFileGeneric: 'I-file ito sa pamamagitan ng proseso ng reklamo ng iyong provider o estado at mag-itago ng kopya. Para sa libreng tulong, hanapin ang iyong opisina ng Protection and Advocacy sa ndrn.org.',
     packetPrint: 'I-print / I-save bilang PDF',
-    packetFooter: 'Ginawa gamit ang HandBook. Pangkalahatang impormasyon, hindi legal na payo.',
+    packetFooter: 'Ginawa gamit ang RightsBook. Pangkalahatang impormasyon, hindi legal na payo.',
     packetOpenFailed: 'Hindi mabuksan ang packet. Payagan ang pop-up at subukang muli.',
     // Documents & photos
     docsTitle: 'Mga dokumento at larawan',
@@ -1074,7 +1074,7 @@ const STRINGS = {
     hcResultsIntro: 'Nagmarka ka ng {n} bahagi na maaaring kailangang tingnang mabuti. Narito ang iyong karapatan at kung ano ang hihilingin.',
     hcYourRight: 'Ang iyong karapatan',
     hcAskFor: 'Hilingin',
-    hcNext: 'Ang puwede mong gawin: dalhin ito sa susunod mong pulong ng plano (IPP), ibahagi sa isang tagapagtanggol, o gamitin para magsimula ng reklamo. Matutulungan ka ng HandBook na gumawa ng sulat o packet ng reklamo.',
+    hcNext: 'Ang puwede mong gawin: dalhin ito sa susunod mong pulong ng plano (IPP), ibahagi sa isang tagapagtanggol, o gamitin para magsimula ng reklamo. Matutulungan ka ng RightsBook na gumawa ng sulat o packet ng reklamo.',
     hcOpenSummary: 'Buksan ang buod na mapi-print',
     hcSaveIncident: 'I-save sa aking incident log',
     hcSaved: 'Na-save sa iyong incident log',
@@ -1148,6 +1148,12 @@ const STRINGS = {
 
 export function getStoredLang() {
   try {
+    // One-time migration from the pre-rebrand "handbook.lang.v1" key: copy the
+    // old value forward if the new key is still empty; never delete the old key.
+    if (localStorage.getItem(LANG_KEY) === null) {
+      const old = localStorage.getItem('handbook.lang.v1')
+      if (old !== null) localStorage.setItem(LANG_KEY, old)
+    }
     const v = localStorage.getItem(LANG_KEY)
     return STRINGS[v] ? v : 'en'
   } catch { return 'en' }

@@ -1,4 +1,4 @@
-// ─── HandBook end-to-end vault crypto ───────────────────────────────────────
+// ─── RightsBook end-to-end vault crypto ─────────────────────────────────────
 // AES-GCM vault-key pattern, copied VERBATIM from the Book/GuestBook suite.
 // NEVER change the iterations, algorithm, or key size: the wrapped vault key is
 // stored in the cloud, and a new device recovers it with email code + PIN only.
@@ -110,10 +110,25 @@ export const wrapVaultKeyWithPin = async (vaultKey, pin, salt) =>
 export const unwrapVaultKeyWithPin = async (wrapped, pin, salt) =>
   unwrapVaultKey(wrapped, await deriveWrappingKey(pin, salt));
 
-// ─── Namespaced local storage (handbook-*) — never collide with other apps ───
-const PIN_KEY = "handbook-pin";        // wrapped vault key JSON (device-local)
-const SALT_KEY = "handbook-enc-salt";  // b64 salt mirror for local unlock
-const EMAIL_KEY = "handbook-cloud-email";
+// ─── Namespaced local storage (rightsbook-*) — never collide with other apps ───
+const PIN_KEY = "rightsbook-pin";        // wrapped vault key JSON (device-local)
+const SALT_KEY = "rightsbook-enc-salt";  // b64 salt mirror for local unlock
+const EMAIL_KEY = "rightsbook-cloud-email";
+
+// One-time migration from the old "handbook-*" key names (pre-rebrand). Copies
+// the old value forward if the new key is still empty; never deletes the old
+// key, so it stays as a safe fallback if this runs more than once.
+const migrateLocalKey = (oldKey, newKey) => {
+  try {
+    if (localStorage.getItem(newKey) === null) {
+      const old = localStorage.getItem(oldKey);
+      if (old !== null) localStorage.setItem(newKey, old);
+    }
+  } catch { /* no-op */ }
+};
+migrateLocalKey("handbook-pin", PIN_KEY);
+migrateLocalKey("handbook-enc-salt", SALT_KEY);
+migrateLocalKey("handbook-cloud-email", EMAIL_KEY);
 
 export const localPin = {
   get: () => { try { return JSON.parse(localStorage.getItem(PIN_KEY)); } catch { return null; } },

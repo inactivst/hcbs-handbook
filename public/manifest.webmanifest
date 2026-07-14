@@ -1,6 +1,6 @@
 {
-  "name": "HandBook - HCBS Rights Guide",
-  "short_name": "HandBook",
+  "name": "RightsBook - HCBS Rights Guide",
+  "short_name": "RightsBook",
   "description": "Your HCBS rights, in plain language",
   "start_url": "/",
   "display": "standalone",

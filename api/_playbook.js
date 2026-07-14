@@ -2,7 +2,7 @@
 // Underscore prefix = not exposed as an API route (same as _corpus.js).
 //
 // These rank ABOVE the raw regulations: when an entry matches a question,
-// HandBook leads with it. This is where your team captures the local nuance
+// RightsBook leads with it. This is where your team captures the local nuance
 // the statutes don't spell out (how a particular regional center actually
 // handles something, a practical next step, a common misunderstanding).
 // Everything here is treated as trusted, so keep it accurate.
