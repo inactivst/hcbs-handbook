@@ -1160,7 +1160,6 @@ export default function App() {
             vaultDocs={vaultDocs}
             onOpenAccount={() => setShowCloud(true)}
             isCA={(stateCode || 'CA') === 'CA'}
-            stateCode={stateCode || 'CA'}
           />
         )}
       </div>
@@ -2015,7 +2014,7 @@ function WhereToStartSheet({ code, onClose }) {
 // sheet of plain-language, grouped guides. The public self-check stays featured.
 function Library({ stateCode, onStateChange, onSaveIncident }) {
   const t = useT()
-  const [view, setView] = useState(null) // null | 'state' | 'federal' | 'codes' | 'others' | 'rc' | 'start'
+  const [view, setView] = useState(null) // null | 'state' | 'federal' | 'codes' | 'others' | 'rc' | 'start' | 'help'
   const [showCheck, setShowCheck] = useState(false)
   const name = stateName(stateCode)
   const covered = stateCovered(stateCode)
@@ -2047,23 +2046,22 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
       <HubHero icon={IcStar} title={t('rtYourStateCard', { name })} sub={covered ? t('rtYourStateSub') : t('rtYourStateSubBase')} onClick={() => setView('state')} />
       <HubHero icon={IcColumns} title={t('rtFederalCard')} sub={t('rtFederalSub2')} onClick={() => setView('federal')} />
 
-      {/* Help & contacts (the advocacy/agency phone lines) live on the Vault tab,
-          not here - one home for them, no duplication. This grid holds only the
-          state-specific rights tools, so it's guarded to avoid an empty row when
-          a base state has neither service codes nor a regional-center guide. */}
-      {(hasCodes || stateCode === 'CA' || hasStateGuide(stateCode)) && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
-          {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { name })} onClick={() => setView('codes')} />}
-          {/* Regional centers are a California (Lanterman Act) construct - CA only. */}
-          {stateCode === 'CA' && (
-            <VaultTile icon={<IcMap size={22} />} label={t('rtTileRc')} sub={t('rtTileRcSub')} onClick={() => setView('rc')} />
-          )}
-          {/* The regional-center equivalent for other big states (LIDDA, APD, OPWDD...). */}
-          {hasStateGuide(stateCode) && (
-            <VaultTile icon={<IcMap size={22} />} label={t('rtTileStart')} sub={t('rtTileStartSub')} onClick={() => setView('start')} />
-          )}
-        </div>
-      )}
+      {/* Rights-hub tools. Help & contacts lives here alongside the state's
+          regional-center / service-code cards (public reference info, same as
+          the rest of this tab); the Vault stays purely login-gated records.
+          Every state has at least the help tile, so the grid always renders. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
+        {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { name })} onClick={() => setView('codes')} />}
+        {/* Regional centers are a California (Lanterman Act) construct - CA only. */}
+        {stateCode === 'CA' && (
+          <VaultTile icon={<IcMap size={22} />} label={t('rtTileRc')} sub={t('rtTileRcSub')} onClick={() => setView('rc')} />
+        )}
+        {/* The regional-center equivalent for other big states (LIDDA, APD, OPWDD...). */}
+        {hasStateGuide(stateCode) && (
+          <VaultTile icon={<IcMap size={22} />} label={t('rtTileStart')} sub={t('rtTileStartSub')} onClick={() => setView('start')} />
+        )}
+        <VaultTile icon={<IcPhone size={22} />} label={t('rtTileHelp')} sub={t('rtTileHelpSub')} onClick={() => setView('help')} />
+      </div>
 
       {/* Other states spans full width below the primary cards - every state gets the federal floor. */}
       <div style={{ marginTop: 12 }}>
@@ -2077,6 +2075,11 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
       {view === 'others' && <OtherStatesSheet currentCode={stateCode} onClose={() => setView(null)} />}
       {view === 'rc' && <RcSheet onClose={() => setView(null)} />}
       {view === 'start' && <WhereToStartSheet code={stateCode} onClose={() => setView(null)} />}
+      {view === 'help' && (
+        <Modal onClose={() => setView(null)} title={t('helpContacts')}>
+          <ContactsCard stateCode={stateCode} />
+        </Modal>
+      )}
     </div>
   )
 }
@@ -3085,9 +3088,9 @@ function VaultTile({ icon, label, sub, onClick }) {
 // of tiles; tapping one drills into that tool IN-PAGE with a labeled back
 // control. Add/edit forms are in-page too - so their fields ride the app-wide
 // keyboard recenter and nothing re-portals (no focus loss, no close "blink").
-function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA, stateCode }) {
+function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, onOpenAccount, isCA }) {
   const t = useT()
-  const [view, setView] = useState('hub') // hub | incidents | deadlines | letters | documents | packet | contacts
+  const [view, setView] = useState('hub') // hub | incidents | deadlines | letters | documents | packet
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const [packetError, setPacketError] = useState('')
@@ -3195,7 +3198,8 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
     )
   }
 
-  // Signed out or locked: sign-in prompt + the public help lines.
+  // Signed out or locked: just the sign-in prompt. The Vault is only login-gated
+  // personal records; public help lines live on the Rights tab.
   if (!ready) {
     return (
       <Page>
@@ -3204,8 +3208,6 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{t('vaultSignedOut')}</div>
           <button onClick={onOpenAccount} style={cloudBtn('primary')}>{t('vaultOpenAccount')}</button>
         </div>
-        <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, marginBottom: 8 }}>{t('helpContacts')}</div>
-        <ContactsCard stateCode={stateCode} />
       </Page>
     )
   }
@@ -3225,7 +3227,6 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
           <VaultTile icon={<IcMail size={22} />} label={t('letters')} sub={t('ltTileSub')} onClick={() => setView('letters')} />
           <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setView('documents')} />
           <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setView('packet')} />
-          <VaultTile icon={<IcPhone size={22} />} label={t('helpContacts')} sub={t('tileContactsSub')} onClick={() => setView('contacts')} />
         </div>
       </Page>
 
@@ -3283,12 +3284,6 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
       {view === 'letters' && (
         <Modal onClose={closeSheet} title={t('letters')}>
           <LettersView />
-        </Modal>
-      )}
-
-      {view === 'contacts' && (
-        <Modal onClose={closeSheet} title={t('helpContacts')}>
-          <ContactsCard stateCode={stateCode} />
         </Modal>
       )}
     </>
