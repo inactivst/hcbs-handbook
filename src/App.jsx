@@ -1327,10 +1327,12 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
 
 // Compact "Answering for [state]" chooser - the same Select used everywhere,
 // shrunk to a pill so it reads as a setting, not a form field.
+// Rendered INSIDE the chat scroll area (top of the thread), so it scrolls away
+// while reading instead of stacking another pinned layer over the answer.
 function StateBar({ stateCode, onStateChange }) {
   const t = useT()
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px 0 18px', flexShrink: 0 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0 0 4px', flexShrink: 0 }}>
       <span style={{ fontSize: 13, color: C.sub, flexShrink: 0 }}>{t('answeringFor')}</span>
       <div style={{ flex: 1, minWidth: 0, maxWidth: 240 }}>
         <Select
@@ -1351,6 +1353,12 @@ function StateBar({ stateCode, onStateChange }) {
 function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onStateChange, onCompare }) {
   const t = useT()
   const [input, setInput] = useState('')
+  // While READING an answer (conversation open, field idle and empty) the
+  // composer shrinks to a slim pill and the Ask button hides - more room for
+  // the answer, but the field stays visible and tappable (capture-first:
+  // never collapse it behind an extra tap).
+  const [composerFocus, setComposerFocus] = useState(false)
+  const compact = messages.length > 0 && !composerFocus && !input.trim()
   const scrollRef = useRef(null)
   const lastMsgRef = useRef(null)
   const prevLenRef = useRef(0)
@@ -1393,11 +1401,11 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
 
   return (
     <>
-      <StateBar stateCode={stateCode} onStateChange={onStateChange} />
       <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {indicator}
         <div ref={contentRef} style={{ ...contentStyle, flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '16px 16px 8px 18px', WebkitOverflowScrolling: 'touch' }}>
+          <div ref={scrollRef} style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: '12px 16px 14px 18px', WebkitOverflowScrolling: 'touch' }}>
+            <StateBar stateCode={stateCode} onStateChange={onStateChange} />
             {messages.length === 0 && (
               <div style={{ marginTop: 18 }}>
                 <div style={{ fontSize: 14, color: C.sub, marginBottom: 10 }}>{t('tryAsking')}</div>
@@ -1442,7 +1450,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
       {/* Composer lifts above the on-screen keyboard (marginBottom:kbInset - the
           Modal recipe); nav clearance collapses while the keyboard is up since
           the nav is behind the keyboard anyway. */}
-      <div style={{ padding: `8px 16px ${kbInset ? '10px' : NAV_CLEARANCE}`, borderTop: `1px solid ${C.line}`, background: C.bg, flexShrink: 0, marginBottom: kbInset, transition: 'margin-bottom 0.2s ease' }}>
+      <div style={{ padding: `${compact ? 6 : 8}px 16px ${kbInset ? '10px' : NAV_CLEARANCE}`, borderTop: `1px solid ${C.line}`, background: C.bg, flexShrink: 0, marginBottom: kbInset, transition: 'margin-bottom 0.2s ease, padding 0.15s ease' }}>
         <form
           onSubmit={(e) => { e.preventDefault(); submit(input) }}
           style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}
@@ -1453,19 +1461,23 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onFocus={() => setComposerFocus(true)}
+              onBlur={() => setComposerFocus(false)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input) } }}
               placeholder={t('composerPlaceholder')}
               rows={1}
-              style={{ ...inputStyle, resize: 'none', borderRadius: 14, padding: '12px 14px', lineHeight: 1.4, maxHeight: 120 }}
+              style={{ ...inputStyle, resize: 'none', borderRadius: 14, padding: compact ? '7px 14px' : '12px 14px', lineHeight: 1.4, maxHeight: 120, transition: 'padding 0.15s ease' }}
             />
           </div>
-          <button
-            type="submit"
-            disabled={busy || !input.trim()}
-            style={{ background: busy || !input.trim() ? C.line : C.accent, color: '#fff', border: 'none', borderRadius: 14, padding: '13px 18px', fontSize: 15, fontWeight: 700, cursor: busy || !input.trim() ? 'default' : 'pointer', marginBottom: 4 }}
-          >
-            {t('ask')}
-          </button>
+          {!compact && (
+            <button
+              type="submit"
+              disabled={busy || !input.trim()}
+              style={{ background: busy || !input.trim() ? C.line : C.accent, color: '#fff', border: 'none', borderRadius: 14, padding: '13px 18px', fontSize: 15, fontWeight: 700, cursor: busy || !input.trim() ? 'default' : 'pointer', marginBottom: 4 }}
+            >
+              {t('ask')}
+            </button>
+          )}
         </form>
       </div>
     </>
