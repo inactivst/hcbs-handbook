@@ -2170,6 +2170,7 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
   const lang = useContext(LangContext)
   const [view, setView] = useState(null) // null | 'state' | 'federal' | 'codes' | 'others' | 'rc' | 'start' | 'help'
   const [showCheck, setShowCheck] = useState(false)
+  const [showRmc, setShowRmc] = useState(false)
   const name = stateName(stateCode)
   const covered = stateCovered(stateCode)
   const pack = STATES[stateCode]
@@ -2188,6 +2189,20 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
         <span style={{ flex: 1, minWidth: 0 }}>
           <span style={{ display: 'block', fontSize: 16, fontWeight: 700, color: C.ink }}>{t('homeCheck')}</span>
           <span style={{ display: 'block', fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 1.4 }}>{t('hcRightsSub')}</span>
+        </span>
+        <IcChevron dir="right" size={18} style={{ color: C.accent, flexShrink: 0 }} />
+      </button>
+
+      {/* Sibling tool: check ONE specific restriction against the 8 required
+          safeguards. Calm card treatment so the pair doesn't shout. */}
+      <button
+        onClick={() => setShowRmc(true)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 14, margin: '-8px 0 18px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}
+      >
+        <span style={{ width: 42, height: 42, borderRadius: 12, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcShield size={22} /></span>
+        <span style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ display: 'block', fontSize: 16, fontWeight: 700, color: C.ink }}>{t('rmcCard')}</span>
+          <span style={{ display: 'block', fontSize: 13, color: C.sub, marginTop: 2, lineHeight: 1.4 }}>{t('rmcCardSub')}</span>
         </span>
         <IcChevron dir="right" size={18} style={{ color: C.accent, flexShrink: 0 }} />
       </button>
@@ -2230,6 +2245,7 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
       )}
 
       {showCheck && <HomeCheckSheet onClose={() => setShowCheck(false)} onSaveIncident={onSaveIncident} />}
+      {showRmc && <RmcSheet onClose={() => setShowRmc(false)} onSaveIncident={onSaveIncident} />}
       {view === 'state' && <StateSheet code={stateCode} onClose={() => setView(null)} />}
       {view === 'federal' && <FederalSheet onClose={() => setView(null)} />}
       {view === 'codes' && <CodesSheet code={stateCode} onClose={() => setView(null)} />}
@@ -2573,6 +2589,49 @@ const HOMECHECK_ITEMS = [
   { id: 'decorate', cite: '42 CFR 441.301(c)(4)(vi)(B)', res: true },
   { id: 'modified', cite: '42 CFR 441.301(c)(4)(vi)', res: false },
 ]
+
+// ─── RESTRICTION CHECKER ──────────────────────────────────────────────────────
+// The 8 safeguards a rights modification must document, straight from the
+// person-centered-plan requirements the modification rule points to. One cite
+// per element - each chip names the exact subsection, not the parent reg.
+// Output language is deliberately soft ("not identified"), never "illegal".
+const RMC_ITEMS = [
+  { id: 'need', cite: '42 CFR 441.301(c)(2)(xiii)(A)' },
+  { id: 'positive', cite: '42 CFR 441.301(c)(2)(xiii)(B)' },
+  { id: 'lighter', cite: '42 CFR 441.301(c)(2)(xiii)(C)' },
+  { id: 'written', cite: '42 CFR 441.301(c)(2)(xiii)(D)' },
+  { id: 'data', cite: '42 CFR 441.301(c)(2)(xiii)(E)' },
+  { id: 'review', cite: '42 CFR 441.301(c)(2)(xiii)(F)' },
+  { id: 'consent', cite: '42 CFR 441.301(c)(2)(xiii)(G)' },
+  { id: 'harm', cite: '42 CFR 441.301(c)(2)(xiii)(H)' },
+]
+const RMC_WHAT = ['food', 'visitors', 'lock', 'roommate', 'decorate', 'schedule', 'money', 'privacy', 'other']
+
+function buildRmcHtml(missing, blanket, whatLabel, t) {
+  const rows = missing.map((f) => `<div class="inc">
+    <div class="inc-what">${escapeHtml(t(`rm_${f.id}_q`))}</div>
+    <div class="inc-meta"><span class="lbl">${escapeHtml(t('hcAskFor'))}:</span> ${escapeHtml(t(`rm_${f.id}_a`))}</div>
+    <div class="cite-sm">${escapeHtml(f.cite)}</div>
+  </div>`).join('')
+  const blanketBlock = blanket
+    ? `<p class="intro">${escapeHtml(t('rmcBlanket'))} <span class="cite-sm">42 CFR 441.301(c)(4)(vi)(F)</span></p>`
+    : ''
+  return `<!doctype html><html><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(t('rmcSummaryTitle'))}</title>
+<style>${PRINT_CSS}</style></head>
+<body><div class="page">
+  <div class="bar"><button class="print-btn" onclick="window.print()">${escapeHtml(t('packetPrint'))}</button></div>
+  <h1>${escapeHtml(t('rmcSummaryTitle'))}</h1>
+  <div class="setting">${escapeHtml(t('rmcWhat'))} ${escapeHtml(whatLabel)}</div>
+  ${blanketBlock}
+  ${missing.length ? `<p class="intro">${escapeHtml(t('rmcResultsIntro', { n: missing.length }))}</p>${rows}` : ''}
+  <h2>${escapeHtml(t('hcNextTitle'))}</h2>
+  <p>${escapeHtml(t('rmcNext'))}</p>
+  <div class="foot">${escapeHtml(t('packetFooter'))}</div>
+</div></body></html>`
+}
+const openRmc = (missing, blanket, whatLabel, t) => openHtmlDoc(buildRmcHtml(missing, blanket, whatLabel, t))
 
 function buildHomeCheckHtml(flagged, setting, t) {
   const rows = flagged.map((f) => `<div class="inc">
@@ -3044,6 +3103,124 @@ function DeadlineForm({ initial, onSave, onCancel, isCA }) {
 // Guided self-check of everyday HCBS rights. Purely local (nothing saved unless
 // the person chooses to): answer the questions, then see which rights may need a
 // closer look, with a printable summary and a one-tap "save to incident log".
+// "Check a restriction": walk a specific limit (locked fridge, no visitors...)
+// through the 8 documentation safeguards the federal rule requires. Mirrors
+// HomeCheckSheet's flow; deterministic - no AI involved.
+function RmcSheet({ onClose, onSaveIncident }) {
+  const t = useT()
+  const [what, setWhat] = useState('food')
+  const [setting, setSetting] = useState('provider')
+  const [scope, setScope] = useState('unsure')
+  const [answers, setAnswers] = useState({})
+  const [showResults, setShowResults] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState('')
+  const missing = RMC_ITEMS.filter((it) => answers[it.id] === 'no' || answers[it.id] === 'unsure')
+  const answered = RMC_ITEMS.some((it) => answers[it.id])
+  const blanket = scope === 'all'
+  const whatLabel = t(`rmcW_${what}`)
+
+  const choiceRow = (id) => (
+    <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+      {['yes', 'no', 'unsure'].map((v) => {
+        const active = answers[id] === v
+        const col = v === 'yes' ? C.accent : v === 'no' ? C.danger : C.sub
+        const bg = !active ? C.card : v === 'yes' ? C.accentSoft : v === 'no' ? '#F7E4DF' : C.bg
+        return (
+          <button
+            key={v} onClick={() => setAnswers((a) => ({ ...a, [id]: v }))} aria-pressed={active}
+            style={{ flex: 1, padding: '9px 6px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${active ? col : C.border}`, background: bg, color: active ? col : C.sub }}
+          >
+            {t(v === 'yes' ? 'hcYes' : v === 'no' ? 'hcNo' : 'hcUnsure')}
+          </button>
+        )
+      })}
+    </div>
+  )
+
+  const saveToLog = () => {
+    setErr('')
+    const lines = [
+      ...(blanket ? ['- ' + t('rmcBlanket')] : []),
+      ...missing.map((f) => '- ' + t(`rm_${f.id}_q`)),
+    ]
+    onSaveIncident({ at: todayISO(), what: t('rmcIncidentIntro', { what: whatLabel }) + '\n\n' + lines.join('\n'), where: '', who: '' })
+    setSaved(true)
+  }
+  const openSummary = () => { setErr(''); if (!openRmc(missing, blanket, whatLabel, t)) setErr(t('packetOpenFailed')) }
+  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
+  const resultCard = (bg, border) => ({ background: bg, border: `1px solid ${border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 10, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' })
+
+  if (showResults) {
+    return (
+      <Modal onClose={onClose} title={t('rmcCard')}>
+        {blanket && (
+          <div style={{ ...resultCard('#F7E4DF', `${C.danger}55`) }}>
+            <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.5 }}>{t('rmcBlanket')}</div>
+            <div style={{ fontSize: 11, color: C.ink3, marginTop: 6 }}>42 CFR 441.301(c)(4)(vi)(F)</div>
+          </div>
+        )}
+        {missing.length === 0 ? (
+          !blanket && <div style={resultCard(C.card, C.border)}><div style={{ fontSize: 14, color: C.ink, lineHeight: 1.55 }}>{t('rmcResultsAllGood')}</div></div>
+        ) : (
+          <>
+            <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.55, margin: '4px 0 14px' }}>{t('rmcResultsIntro', { n: missing.length })}</div>
+            {missing.map((f) => (
+              <div key={f.id} style={resultCard(C.card, C.border)}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, lineHeight: 1.4 }}>{t(`rm_${f.id}_q`)}</div>
+                <div style={{ fontSize: 13, color: C.sub, marginTop: 7, lineHeight: 1.5 }}><span style={{ fontWeight: 700, color: C.accent }}>{t('hcAskFor')}:</span> {t(`rm_${f.id}_a`)}</div>
+                <div style={{ fontSize: 11, color: C.ink3, marginTop: 6 }}>{f.cite}</div>
+              </div>
+            ))}
+          </>
+        )}
+        {(blanket || missing.length > 0) && (
+          <>
+            <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, margin: '14px 0' }}>{t('rmcNext')}</div>
+            <button onClick={openSummary} style={cloudBtn('primary')}>{t('hcOpenSummary')}</button>
+            {onSaveIncident && (
+              <button onClick={saveToLog} disabled={saved} style={{ ...cloudBtn('secondary'), marginTop: 8, opacity: saved ? 0.6 : 1 }}>{saved ? t('hcSaved') : t('hcSaveIncident')}</button>
+            )}
+            <CloudNote error={err} />
+          </>
+        )}
+        <button onClick={() => { setShowResults(false); setSaved(false) }} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('hcBack')}</button>
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal onClose={onClose} title={t('rmcCard')}>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 4 }}>{t('rmcIntro')}</div>
+      <label style={fieldLabel}>{t('rmcWhat')}</label>
+      <Select value={what} onChange={setWhat} options={RMC_WHAT.map((w) => ({ value: w, label: t(`rmcW_${w}`) }))} ariaLabel={t('rmcWhat')} />
+      <label style={fieldLabel}>{t('hcSetting')}</label>
+      <Select
+        value={setting} onChange={setSetting} ariaLabel={t('hcSetting')}
+        options={[{ value: 'provider', label: t('hcSettingProvider') }, { value: 'home', label: t('hcSettingHome') }]}
+      />
+      {setting === 'home' && (
+        <div style={{ background: C.accentSoft, border: `1px solid ${C.accent}33`, borderRadius: 12, padding: '11px 13px', fontSize: 13, color: C.ink, lineHeight: 1.5, marginTop: 10 }}>
+          {t('rmcHomeNote')}
+        </div>
+      )}
+      <label style={fieldLabel}>{t('rmcScope')}</label>
+      <Select
+        value={scope} onChange={setScope} ariaLabel={t('rmcScope')}
+        options={[{ value: 'all', label: t('rmcScopeAll') }, { value: 'me', label: t('rmcScopeMe') }, { value: 'unsure', label: t('rmcScopeUnsure') }]}
+      />
+      <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.5, margin: '18px 0 10px' }}>{t('rmcQuestionsTitle')}</div>
+      {RMC_ITEMS.map((it) => (
+        <div key={it.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 10, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <div style={{ fontSize: 15, color: C.ink, lineHeight: 1.4 }}>{t(`rm_${it.id}_q`)}</div>
+          {choiceRow(it.id)}
+        </div>
+      ))}
+      <button onClick={() => setShowResults(true)} disabled={!answered} style={{ ...cloudBtn('primary'), marginTop: 4, opacity: answered ? 1 : 0.5 }}>{t('hcSeeResults')}</button>
+    </Modal>
+  )
+}
+
 function HomeCheckSheet({ onClose, onSaveIncident }) {
   const t = useT()
   const [setting, setSetting] = useState('provider')
