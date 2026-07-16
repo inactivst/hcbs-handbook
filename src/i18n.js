@@ -308,6 +308,13 @@ const STRINGS = {
     // Read-aloud
     readAloud: 'Read aloud',
     stopReading: 'Stop',
+    ansBottomLine: 'Bottom line',
+    ansException: 'The exception',
+    ansAskFor: 'What to ask for',
+    ansReadFull: 'Read the full explanation',
+    ansHideFull: 'Hide the full explanation',
+    chipSimpler: 'Make this simpler',
+    chipExample: 'Give me an example',
     // Home / program self-check (federal HCBS Settings Rule)
     homeCheck: 'Check my home or program',
     hcTileSub: 'Check your rights',
@@ -683,6 +690,13 @@ const STRINGS = {
     // Leer en voz alta
     readAloud: 'Leer en voz alta',
     stopReading: 'Detener',
+    ansBottomLine: 'En resumen',
+    ansException: 'La excepción',
+    ansAskFor: 'Qué pedir',
+    ansReadFull: 'Leer la explicación completa',
+    ansHideFull: 'Ocultar la explicación completa',
+    chipSimpler: 'Explícalo más simple',
+    chipExample: 'Dame un ejemplo',
     // Autoevaluación del hogar / programa
     homeCheck: 'Revisar mi hogar o programa',
     hcTileSub: 'Revisa tus derechos',
@@ -1058,6 +1072,13 @@ const STRINGS = {
     // Basahin nang malakas
     readAloud: 'Basahin nang malakas',
     stopReading: 'Itigil',
+    ansBottomLine: 'Ang buod',
+    ansException: 'Ang eksepsiyon',
+    ansAskFor: 'Ano ang hihilingin',
+    ansReadFull: 'Basahin ang buong paliwanag',
+    ansHideFull: 'Itago ang buong paliwanag',
+    chipSimpler: 'Gawin itong mas simple',
+    chipExample: 'Bigyan ako ng halimbawa',
     // Pagsusuri sa tahanan / programa
     homeCheck: 'Suriin ang aking tahanan o programa',
     hcTileSub: 'Suriin ang iyong karapatan',

@@ -63,8 +63,19 @@ Rules:
 - When a restriction or a denial is involved, tell the person what to ask for: the exact plan or policy wording that allows it, the specific assessed need behind it, what was tried first, and the review date. Concrete things to request help more than general reassurance.
 - If someone describes possible abuse, neglect, or immediate danger, tell them to contact Adult/Child Protective Services or 911 first, then the advocacy channels.
 - Do not ask for or encourage sharing of names, addresses, birthdates, or other identifying details. If a message includes them, do not repeat them back; answer the general question.
-- Keep answers focused: usually 1-3 short paragraphs, or a short list of steps. Offer to go deeper rather than writing an essay.
-- Write in plain text only, not markdown. Never use asterisks for bold/italics or markdown headers. For a list of steps, put each step on its own line starting with a dash and a space ("- like this"), nothing else.`
+- Keep answers focused: keep every section short. Offer to go deeper rather than writing an essay.
+- Write in plain text only, not markdown. Never use asterisks for bold/italics or markdown headers. For a list of steps, put each step on its own line starting with a dash and a space ("- like this"), nothing else.
+- STRUCTURE: for a substantive answer about a right, rule, restriction, denial, or process, split the answer into sections. Each section starts with its marker alone on its own line, in this order:
+[BOTTOM LINE]
+The plain answer in 1-2 sentences. No citations here.
+[EXCEPTION]
+Only when the answer genuinely depends on the situation (an individualized modification, a different setting or program, the person's age): 1-2 sentences on when it can differ. No citations here. Omit the section otherwise.
+[WHAT TO ASK FOR]
+Only when the person faces a restriction, denial, or dispute: a short dash list of the concrete documents and specifics to request. Omit the section otherwise.
+[DETAILS]
+Always last when the markers are used: the full explanation with the citations in parentheses, the caveats, and the concrete next steps (usually 1-3 short paragraphs or a short list of steps).
+- Keep the section markers exactly as written above - English words in square brackets - even when the rest of the answer is written in another language.
+- Do NOT use the section markers for greetings, clarifying questions, one-line factual replies (a phone number, a definition), state comparisons, or follow-ups like "make this simpler" or "give me an example". Those stay plain conversational text.`
 
 function tokenize(s) {
   return (s.toLowerCase().match(/[a-z0-9]{3,}/g) || [])

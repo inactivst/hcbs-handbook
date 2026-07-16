@@ -1410,6 +1410,18 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
                 ref={i === messages.length - 1 ? lastMsgRef : null}
               />
             ))}
+            {/* Quick follow-ups under the latest answer: one tap to re-ask in
+                plainer words or with an example. Only two chips on purpose - a
+                wall of options is its own cognitive-load problem. */}
+            {!busy && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '2px 0 6px' }}>
+                {['chipSimpler', 'chipExample'].map((k) => (
+                  <button key={k} onClick={() => submit(t(k))} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.accent, borderRadius: 999, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {t(k)}
+                  </button>
+                ))}
+              </div>
+            )}
             <div style={{ minHeight: 26, padding: '2px 4px' }}>
               {busy && <span style={{ fontSize: 13, color: C.sub }}>{t('lookingUp')}</span>}
               {!busy && error && <span style={{ fontSize: 13, color: C.danger }}>{error}</span>}
@@ -1486,6 +1498,79 @@ function renderContent(text) {
   })
 }
 
+// ─── Structured answers ──────────────────────────────────────────────────────
+// api/chat.js instructs the model to split substantive answers into sections
+// behind [BOTTOM LINE] / [EXCEPTION] / [WHAT TO ASK FOR] / [DETAILS] markers.
+// The plain-language sections render up front; the cited legal explanation
+// collapses behind "Read the full explanation". Parsing is best-effort: any
+// answer without a usable BOTTOM LINE + DETAILS pair (old saved history, a
+// model that ignored the format) falls back to the classic single-block
+// rendering, with stray marker lines stripped so a half-followed format never
+// shows raw brackets. Markers stay English in every answer language; the
+// labels shown come from i18n.
+const ANSWER_MARKER = /^\[(BOTTOM LINE|EXCEPTION|WHAT TO ASK FOR|DETAILS)\]\s*$/
+function parseAnswer(text) {
+  if (!text || !text.includes('[BOTTOM LINE]')) return null
+  const sections = { PRE: [] }
+  let cur = 'PRE'
+  for (const line of text.split('\n')) {
+    const m = line.trim().match(ANSWER_MARKER)
+    if (m) { cur = m[1]; sections[cur] = sections[cur] || []; continue }
+    sections[cur].push(line)
+  }
+  const get = (k) => (sections[k] || []).join('\n').trim()
+  const bottom = get('BOTTOM LINE')
+  // Stray text before the first marker joins the details so the top stays clean.
+  const details = [get('PRE'), get('DETAILS')].filter(Boolean).join('\n\n')
+  if (!bottom || !details) return null
+  return { bottom, exception: get('EXCEPTION'), askFor: get('WHAT TO ASK FOR'), details }
+}
+
+const stripAnswerMarkers = (text) =>
+  text && text.includes('[BOTTOM LINE]')
+    ? text.split('\n').filter((l) => !ANSWER_MARKER.test(l.trim())).join('\n')
+    : text
+
+function AnswerSectionLabel({ children }) {
+  return <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.8, textTransform: 'uppercase', color: C.accent, marginBottom: 3 }}>{children}</div>
+}
+
+function StructuredAnswer({ parsed }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <AnswerSectionLabel>{t('ansBottomLine')}</AnswerSectionLabel>
+      {renderContent(parsed.bottom)}
+      {parsed.exception && (
+        <div style={{ marginTop: 12 }}>
+          <AnswerSectionLabel>{t('ansException')}</AnswerSectionLabel>
+          {renderContent(parsed.exception)}
+        </div>
+      )}
+      {parsed.askFor && (
+        <div style={{ marginTop: 12 }}>
+          <AnswerSectionLabel>{t('ansAskFor')}</AnswerSectionLabel>
+          {renderContent(parsed.askFor)}
+        </div>
+      )}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 12, background: 'none', border: 'none', color: C.accent, cursor: 'pointer', padding: 0, fontSize: 13, fontWeight: 700, fontFamily: 'inherit' }}
+      >
+        <IcChevron dir={open ? 'down' : 'right'} size={14} style={{ flexShrink: 0 }} />
+        {open ? t('ansHideFull') : t('ansReadFull')}
+      </button>
+      {open && (
+        <div style={{ marginTop: 8, paddingTop: 10, borderTop: `1px solid ${C.line}` }}>
+          {renderContent(parsed.details)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function SourceChips({ sources }) {
   if (!sources || sources.length === 0) return null
   return (
@@ -1542,7 +1627,7 @@ function CompareBlock({ compare, baseState, onCompare }) {
             <div style={{ fontSize: 13, color: C.danger }}>{compare.error}</div>
           ) : (
             <div style={{ fontSize: 14, lineHeight: 1.55, color: C.ink, wordBreak: 'break-word' }}>
-              {renderContent(compare.text)}
+              {renderContent(stripAnswerMarkers(compare.text))}
               <SourceChips sources={compare.sources} />
             </div>
           )}
@@ -1590,6 +1675,7 @@ function ReadAloud({ text }) {
 
 const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref) {
   const user = m.role === 'user'
+  const parsed = user ? null : parseAnswer(m.content)
   return (
     <div ref={ref} style={{ display: 'flex', justifyContent: user ? 'flex-end' : 'flex-start', margin: '10px 0' }}>
       <div style={{ maxWidth: '88%' }}>
@@ -1605,10 +1691,10 @@ const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref
             boxShadow: user ? 'none' : '0 1px 2px rgba(43,42,40,0.04)',
           }}
         >
-          {user ? <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span> : renderContent(m.content)}
+          {user ? <span style={{ whiteSpace: 'pre-wrap' }}>{m.content}</span> : parsed ? <StructuredAnswer parsed={parsed} /> : renderContent(stripAnswerMarkers(m.content))}
         </div>
         {!user && <SourceChips sources={m.sources} />}
-        {!user && <ReadAloud text={m.content} />}
+        {!user && <ReadAloud text={stripAnswerMarkers(m.content)} />}
         {!user && onCompare && <CompareBlock compare={m.compare} baseState={baseState} onCompare={onCompare} />}
       </div>
     </div>
