@@ -35,6 +35,15 @@ const migrateLocalKey = (oldKey, newKey) => {
 migrateLocalKey('handbook.conversations.v1', STORE_KEY)
 migrateLocalKey('handbook.state.v1', STATE_KEY)
 
+// Error reports from answers go to a dedicated alias (never a personal inbox
+// baked into the app). SOURCES_REVIEWED is the date of the last human pass over
+// a state's content, shown ONLY for states whose facts were actually verified
+// against official sources - never badge the unvetted federal-flavor states
+// (that would manufacture a trust signal we can't back).
+const REPORT_EMAIL = 'californiadepartmentoflove+rightsbook@gmail.com'
+const SOURCES_REVIEWED = '2026-07-13'
+const REVIEWED_STATES = new Set(['CA'])
+
 const STATE_OPTIONS = Object.entries(US_STATES).map(([value, label]) => ({ value, label }))
 const stateName = (code) => US_STATES[code] || code
 const stateCovered = (code) => !!STATES[code]
@@ -1406,6 +1415,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
                 key={i}
                 m={m}
                 baseState={stateCode}
+                question={m.role === 'assistant' ? [...messages.slice(0, i)].reverse().find((x) => x.role === 'user')?.content : undefined}
                 onCompare={m.role === 'assistant' ? (target) => onCompare(i, target) : undefined}
                 ref={i === messages.length - 1 ? lastMsgRef : null}
               />
@@ -1673,7 +1683,24 @@ function ReadAloud({ text }) {
   )
 }
 
-const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref) {
+// "Report a possible error" - a mailto so a wrong answer is one tap from a
+// human. Prefills the question + the start of the answer so reports arrive
+// actionable; the person adds what looks wrong.
+function ReportError({ question, answer }) {
+  const t = useT()
+  const body = `Question: ${question || ''}\n\nAnswer (start):\n${stripAnswerMarkers(answer || '').slice(0, 400)}\n\nWhat looks wrong:\n`
+  const href = `mailto:${REPORT_EMAIL}?subject=${encodeURIComponent('RightsBook error report')}&body=${encodeURIComponent(body)}`
+  return (
+    <a
+      href={href}
+      style={{ display: 'inline-flex', alignItems: 'center', marginTop: 6, marginLeft: 16, color: C.ink3, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}
+    >
+      {t('reportError')}
+    </a>
+  )
+}
+
+const Bubble = React.forwardRef(function Bubble({ m, baseState, question, onCompare }, ref) {
   const user = m.role === 'user'
   const parsed = user ? null : parseAnswer(m.content)
   return (
@@ -1695,6 +1722,7 @@ const Bubble = React.forwardRef(function Bubble({ m, baseState, onCompare }, ref
         </div>
         {!user && <SourceChips sources={m.sources} />}
         {!user && <ReadAloud text={stripAnswerMarkers(m.content)} />}
+        {!user && <ReportError question={question} answer={m.content} />}
         {!user && onCompare && <CompareBlock compare={m.compare} baseState={baseState} onCompare={onCompare} />}
       </div>
     </div>
@@ -2116,8 +2144,18 @@ function WhereToStartSheet({ code, onClose }) {
 // The Rights hub: a calm landing of a few big choices (the vault pattern), not
 // one long scroll. The state / federal "sorter" leads; each card opens a focused
 // sheet of plain-language, grouped guides. The public self-check stays featured.
+const reviewedDate = (lang) => {
+  try {
+    return new Date(SOURCES_REVIEWED + 'T12:00:00').toLocaleDateString(
+      { en: 'en-US', es: 'es-ES', tl: 'fil-PH' }[lang] || 'en-US',
+      { year: 'numeric', month: 'long', day: 'numeric' }
+    )
+  } catch { return SOURCES_REVIEWED }
+}
+
 function Library({ stateCode, onStateChange, onSaveIncident }) {
   const t = useT()
+  const lang = useContext(LangContext)
   const [view, setView] = useState(null) // null | 'state' | 'federal' | 'codes' | 'others' | 'rc' | 'start' | 'help'
   const [showCheck, setShowCheck] = useState(false)
   const name = stateName(stateCode)
@@ -2171,6 +2209,13 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
       <div style={{ marginTop: 12 }}>
         <HubHero icon={IcMap} title={t('rtTileOthers')} sub={t('rtTileOthersSub')} onClick={() => setView('others')} />
       </div>
+
+      {/* Freshness line for verified states only (see REVIEWED_STATES). */}
+      {REVIEWED_STATES.has(stateCode) && (
+        <div style={{ fontSize: 12, color: C.ink3, margin: '16px 2px 0', textAlign: 'center', lineHeight: 1.5 }}>
+          {t('srcReviewed', { name, date: reviewedDate(lang) })}
+        </div>
+      )}
 
       {showCheck && <HomeCheckSheet onClose={() => setShowCheck(false)} onSaveIncident={onSaveIncident} />}
       {view === 'state' && <StateSheet code={stateCode} onClose={() => setView(null)} />}
