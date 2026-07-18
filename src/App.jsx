@@ -599,6 +599,7 @@ function Modal({ onClose, children, title, width = 480 }) {
       const onField = !!(t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable))
       drag.current = {
         active: false, started: true, onField,
+        atTop: (scroller()?.scrollTop || 0) <= 8,
         startY: e.touches[0].clientY, startX: e.touches[0].clientX, cur: 0, startT: Date.now(),
       }
     }
@@ -609,7 +610,9 @@ function Modal({ onClose, children, title, width = 480 }) {
       const dy = e.touches[0].clientY - d.startY
       const dx = e.touches[0].clientX - d.startX
       if (!d.active) {
-        const atTopNow = (scroller()?.scrollTop || 0) <= 8
+        // At-top BOTH at touchstart and now — a continuous scroll that reaches the top
+        // mid-gesture can never convert into a close; lift and pull again to dismiss.
+        const atTopNow = d.atTop && (scroller()?.scrollTop || 0) <= 8
         // A pull that began on a field needs a bigger, clearly-vertical move so a
         // tap-to-focus is never hijacked.
         const need = d.onField ? 26 : 16
