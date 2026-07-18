@@ -6,6 +6,7 @@ import { LANG_OPTIONS, LangContext, getStoredLang, storeLang, useT, tr } from '.
 import { CENTERS, COUNTY_TO_RC, LA_CENTERS, COUNTIES, siblingCounties, CA_MAP, DDS_LOOKUP_URL } from './regionalCenters.js'
 import { STATE_GUIDE, hasStateGuide } from './stateGuide.js'
 import { FEDERAL_TERMS, getStateTerms } from './glossary.js'
+import { IS_NATIVE, rcAvailable, rcLoadPricing, rcCheckEntitlement, rcPurchase, rcRestore, withTimeout } from './purchases.js'
 
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
@@ -994,6 +995,28 @@ export default function App() {
 
   useGlobalFieldRecenter()
 
+  // Native (App Store) entitlement. On iOS the Apple receipt via RevenueCat is
+  // authoritative for IAP buyers — it counts even before the RC webhook writes the
+  // Supabase profile. Additive with the web/Supabase `cloud.entitled`, so a web
+  // buyer or an inactive receipt never downgrades the other. Stays false on web.
+  const [nativePaid, setNativePaid] = useState(false)
+  const checkNativeEntitlement = useCallback(async () => {
+    if (!rcAvailable()) return
+    try {
+      const paid = await withTimeout(rcCheckEntitlement(cloud.userId), 5000)
+      if (paid) setNativePaid(true)   // never flip a known-paid back to false on a flaky read
+    } catch { /* keep the last known state */ }
+  }, [cloud.userId])
+  // Check on launch / when the account resolves, and again on foreground (a
+  // renewal or a purchase made elsewhere should reflect when the app returns).
+  useEffect(() => { checkNativeEntitlement() }, [checkNativeEntitlement])
+  useEffect(() => {
+    if (!IS_NATIVE) return
+    const onVis = () => { if (!document.hidden) checkNativeEntitlement() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [checkNativeEntitlement])
+
   // Returning from Stripe Checkout: the redirect lands with ?checkout=success a
   // beat before the webhook writes entitlement, so poll refreshEntitlement a few
   // times, land the user on the Vault, then strip the query so a reload is clean.
@@ -1201,6 +1224,8 @@ export default function App() {
         {tab === 'vault' && (
           <VaultPage
             cloud={cloud}
+            entitled={cloud.entitled || nativePaid}
+            onNativePaid={() => { setNativePaid(true); cloud.refreshEntitlement?.() }}
             incidents={incidents.items}
             onSaveIncident={incidents.save}
             onDeleteIncident={incidents.remove}
@@ -3447,19 +3472,49 @@ function VaultTile({ icon, label, sub, onClick }) {
 
 // The Vault subscription paywall. Shown once a user is signed in + unlocked but
 // has no active plan. The rights chat + Rights hub stay free; this gates only the
-// personal-records Vault. Prices are the fixed US Stripe prices — safe to show as
-// literals on web where we own both sides. NOTE for iOS: the App Store paywall
-// MUST read prices/trial from the RevenueCat offering, never hardcode them
-// (per [[paywall-quote-the-store]]) — this literal copy is web-only.
-function Paywall({ cloud }) {
+// personal-records Vault. TWO purchase paths from ONE UI:
+//   • Web  → Stripe Checkout (/api/checkout). Prices are the fixed US Stripe
+//            prices, safe to show as literals (payAnnualCta/payMonthlyCta).
+//   • iOS  → Apple IAP via RevenueCat (rcPurchase). Apple forbids external payment
+//            for digital goods. Prices are QUOTED FROM THE STORE (rcLoadPricing),
+//            never hardcoded — a literal is wrong in most storefronts and lies
+//            about per-Apple-ID trial eligibility ([[paywall-quote-the-store]]).
+// The native branch is inert on web (IS_NATIVE false), so the web path is unchanged.
+function Paywall({ cloud, onNativePaid }) {
   const t = useT()
-  const [busy, setBusy] = useState('')     // '' | 'monthly' | 'annual'
+  const nativeIap = IS_NATIVE && rcAvailable()
+  const [busy, setBusy] = useState('')       // '' | 'monthly' | 'annual' | 'restore'
   const [err, setErr] = useState('')
+  // Native only: the store's real prices/trial. null until loaded or if unreadable
+  // (then we quote no number, per quote-the-store).
+  const [pricing, setPricing] = useState(null)
 
+  useEffect(() => {
+    if (!nativeIap) return
+    let alive = true
+    ;(async () => {
+      try { const p = await withTimeout(rcLoadPricing(cloud.userId), 8000); if (alive) setPricing(p) }
+      catch { /* leave null → generic labels, never a guessed price */ }
+    })()
+    return () => { alive = false }
+  }, [nativeIap, cloud.userId])
+
+  // Web: hand off to Stripe. Native: buy via RevenueCat with a 45s watchdog (a
+  // dismissed StoreKit sheet can hang purchasePackage; the UI must always recover,
+  // and a genuinely-completed purchase is picked up by the receipt check anyway).
   const start = async (plan) => {
     setBusy(plan); setErr('')
+    if (nativeIap) {
+      try {
+        const timeout = new Promise((_, rej) => setTimeout(() => rej(Object.assign(new Error('timeout'), { _timeout: true })), 45000))
+        if (await Promise.race([rcPurchase(plan, cloud.userId), timeout])) onNativePaid?.()
+      } catch (e) {
+        if (!(e?._timeout || e?.userCancelled || /cancel/i.test(e?.message || ''))) setErr(e?.message || t('payError'))
+      } finally { setBusy('') }
+      return
+    }
     try {
-      const res = await fetch('/api/checkout', {
+      const res = await fetch(`${API_ORIGIN}/api/checkout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: cloud.userId, email: cloud.email, plan }),
@@ -3473,12 +3528,34 @@ function Paywall({ cloud }) {
     }
   }
 
+  // App Store requirement: a way to restore a prior purchase on a new device.
+  const restore = async () => {
+    setBusy('restore'); setErr('')
+    try {
+      if (await rcRestore(cloud.userId)) onNativePaid?.()
+      else setErr(t('payRestoreNone'))
+    } catch (e) { setErr(e?.message || t('payError')) } finally { setBusy('') }
+  }
+
   const feature = (text) => (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 9 }}>
       <span style={{ color: C.accent, flexShrink: 0, marginTop: 1 }}><IcCheck size={17} /></span>
       <span style={{ fontSize: 14, color: C.ink, lineHeight: 1.45 }}>{text}</span>
     </div>
   )
+
+  // CTA labels + savings chip differ by path. Native quotes the store (or a
+  // no-number fallback while pricing loads); web uses the fixed-price literals.
+  const annualLabel = nativeIap
+    ? (pricing?.annual ? t('payAnnualPriced', { price: pricing.annual.priceString }) : t('payAnnualGeneric'))
+    : t('payAnnualCta')
+  const monthlyLabel = nativeIap
+    ? (pricing?.monthly ? t('payMonthlyPriced', { price: pricing.monthly.priceString }) : t('payMonthlyGeneric'))
+    : t('payMonthlyCta')
+  const savingsText = nativeIap
+    ? (pricing?.annual?.savingsPct > 0 ? t('paySavePct', { pct: pricing.annual.savingsPct }) : '')
+    : t('paySaveChip')
+  const trialDays = nativeIap ? (pricing?.annual?.trialDays || 0) : 0
 
   return (
     <div>
@@ -3499,16 +3576,27 @@ function Paywall({ cloud }) {
 
       {/* Annual first — it's the value we steer toward — with a savings chip. */}
       <button disabled={!!busy} onClick={() => start('annual')} style={{ ...cloudBtn('primary'), opacity: busy && busy !== 'annual' ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-        {busy === 'annual' ? t('payStarting') : t('payAnnualCta')}
-        {busy !== 'annual' && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: '#fff', borderRadius: 999, padding: '2px 8px' }}>{t('paySaveChip')}</span>
+        {busy === 'annual' ? t('payStarting') : annualLabel}
+        {busy !== 'annual' && savingsText && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: '#fff', borderRadius: 999, padding: '2px 8px' }}>{savingsText}</span>
         )}
       </button>
       <button disabled={!!busy} onClick={() => start('monthly')} style={{ ...cloudBtn('secondary'), marginTop: 10, opacity: busy && busy !== 'monthly' ? 0.6 : 1 }}>
-        {busy === 'monthly' ? t('payStarting') : t('payMonthlyCta')}
+        {busy === 'monthly' ? t('payStarting') : monthlyLabel}
       </button>
 
+      {trialDays > 0 && (
+        <div style={{ fontSize: 12, color: C.accent, fontWeight: 600, textAlign: 'center', margin: '10px 2px 0' }}>{t('payTrialLine', { days: trialDays })}</div>
+      )}
+
       <CloudNote error={err} />
+
+      {/* App Store requires a Restore control on native. */}
+      {nativeIap && (
+        <button disabled={!!busy} onClick={restore} style={{ ...cloudBtn('secondary'), marginTop: 10, color: C.accent }}>
+          {busy === 'restore' ? t('payRestoring') : t('payRestore')}
+        </button>
+      )}
 
       <div style={{ fontSize: 12, color: C.ink3, lineHeight: 1.5, margin: '14px 2px 0', textAlign: 'center' }}>{t('payFinePrint')}</div>
 
@@ -3523,7 +3611,7 @@ function Paywall({ cloud }) {
 // of tiles; tapping one drills into that tool IN-PAGE with a labeled back
 // control. Add/edit forms are in-page too - so their fields ride the app-wide
 // keyboard recenter and nothing re-portals (no focus loss, no close "blink").
-function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, isCA }) {
+function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, onDeleteIncident, deadlines, onSaveDeadline, onDeleteDeadline, vaultDocs, isCA }) {
   const t = useT()
   const [view, setView] = useState('hub') // hub | incidents | deadlines | letters | documents | packet
   const [editing, setEditing] = useState(null) // null | 'new' | incident
@@ -3655,12 +3743,13 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
 
   // Signed in + unlocked, but no active subscription: the Vault tools are the
   // paid tier, so show the paywall in place of the hub. The rights chat and
-  // Rights hub stay free; only this personal-records area is gated.
-  if (!cloud.entitled) {
+  // Rights hub stay free; only this personal-records area is gated. `entitled`
+  // is web (Stripe/Supabase) OR native (Apple/RevenueCat) — either unlocks.
+  if (!entitled) {
     return (
       <Page>
         <PageTitle>{t('navVault')}</PageTitle>
-        <Paywall cloud={cloud} />
+        <Paywall cloud={cloud} onNativePaid={onNativePaid} />
       </Page>
     )
   }
