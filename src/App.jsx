@@ -994,6 +994,29 @@ export default function App() {
 
   useGlobalFieldRecenter()
 
+  // Returning from Stripe Checkout: the redirect lands with ?checkout=success a
+  // beat before the webhook writes entitlement, so poll refreshEntitlement a few
+  // times, land the user on the Vault, then strip the query so a reload is clean.
+  const refreshEnt = cloud.refreshEntitlement
+  useEffect(() => {
+    let params
+    try { params = new URLSearchParams(window.location.search) } catch { return }
+    const outcome = params.get('checkout')
+    if (!outcome) return
+    if (outcome === 'success') {
+      setTab('vault')
+      let tries = 0
+      const tick = () => {
+        refreshEnt?.()
+        if (++tries < 5) setTimeout(tick, 1500)
+      }
+      tick()
+    }
+    try {
+      window.history.replaceState({}, '', window.location.pathname)
+    } catch { /* leave the query; harmless */ }
+  }, [refreshEnt])
+
   useEffect(() => {
     try {
       localStorage.setItem(STORE_KEY, JSON.stringify(conversations))
@@ -3422,6 +3445,80 @@ function VaultTile({ icon, label, sub, onClick }) {
   )
 }
 
+// The Vault subscription paywall. Shown once a user is signed in + unlocked but
+// has no active plan. The rights chat + Rights hub stay free; this gates only the
+// personal-records Vault. Prices are the fixed US Stripe prices — safe to show as
+// literals on web where we own both sides. NOTE for iOS: the App Store paywall
+// MUST read prices/trial from the RevenueCat offering, never hardcode them
+// (per [[paywall-quote-the-store]]) — this literal copy is web-only.
+function Paywall({ cloud }) {
+  const t = useT()
+  const [busy, setBusy] = useState('')     // '' | 'monthly' | 'annual'
+  const [err, setErr] = useState('')
+
+  const start = async (plan) => {
+    setBusy(plan); setErr('')
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: cloud.userId, email: cloud.email, plan }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 503) { setErr(t('payComingSoon')); setBusy(''); return }
+      if (!res.ok || !data.url) throw new Error(data.error || '')
+      window.location.href = data.url            // hand off to Stripe Checkout
+    } catch (e) {
+      setErr(e.message || t('payError')); setBusy('')
+    }
+  }
+
+  const feature = (text) => (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 9, marginBottom: 9 }}>
+      <span style={{ color: C.accent, flexShrink: 0, marginTop: 1 }}><IcCheck size={17} /></span>
+      <span style={{ fontSize: 14, color: C.ink, lineHeight: 1.45 }}>{text}</span>
+    </div>
+  )
+
+  return (
+    <div>
+      <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('paySub')}</div>
+
+      <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: '18px 16px', marginBottom: 16, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+          <span style={{ width: 40, height: 40, borderRadius: 11, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcShield size={20} /></span>
+          <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, color: C.ink, lineHeight: 1.15 }}>{t('payTitle')}</div>
+        </div>
+        {feature(t('payFeatIncidents'))}
+        {feature(t('payFeatDeadlines'))}
+        {feature(t('payFeatLetters'))}
+        {feature(t('payFeatDocs'))}
+        {feature(t('payFeatPacket'))}
+        {feature(t('payFeatSync'))}
+      </div>
+
+      {/* Annual first — it's the value we steer toward — with a savings chip. */}
+      <button disabled={!!busy} onClick={() => start('annual')} style={{ ...cloudBtn('primary'), opacity: busy && busy !== 'annual' ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        {busy === 'annual' ? t('payStarting') : t('payAnnualCta')}
+        {busy !== 'annual' && (
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: '#fff', borderRadius: 999, padding: '2px 8px' }}>{t('paySaveChip')}</span>
+        )}
+      </button>
+      <button disabled={!!busy} onClick={() => start('monthly')} style={{ ...cloudBtn('secondary'), marginTop: 10, opacity: busy && busy !== 'monthly' ? 0.6 : 1 }}>
+        {busy === 'monthly' ? t('payStarting') : t('payMonthlyCta')}
+      </button>
+
+      <CloudNote error={err} />
+
+      <div style={{ fontSize: 12, color: C.ink3, lineHeight: 1.5, margin: '14px 2px 0', textAlign: 'center' }}>{t('payFinePrint')}</div>
+
+      <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 16, color: C.sub }}>
+        {t('signOut')}
+      </button>
+    </div>
+  )
+}
+
 // The Vault is now its own PAGE/tab (like Rights), not a stack of sheets. A hub
 // of tiles; tapping one drills into that tool IN-PAGE with a labeled back
 // control. Add/edit forms are in-page too - so their fields ride the app-wide
@@ -3552,6 +3649,18 @@ function VaultPage({ cloud, incidents, onSaveIncident, onDeleteIncident, deadlin
           )}
           <AuthFlow cloud={cloud} />
         </div>
+      </Page>
+    )
+  }
+
+  // Signed in + unlocked, but no active subscription: the Vault tools are the
+  // paid tier, so show the paywall in place of the hub. The rights chat and
+  // Rights hub stay free; only this personal-records area is gated.
+  if (!cloud.entitled) {
+    return (
+      <Page>
+        <PageTitle>{t('navVault')}</PageTitle>
+        <Paywall cloud={cloud} />
       </Page>
     )
   }

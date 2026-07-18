@@ -57,6 +57,14 @@ export function useCloud() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
+  // Entitlement (the paid Vault subscription). PLAINTEXT, unlike vault data: the
+  // payment webhook writes these columns server-side and we read them here to
+  // gate the Vault UI — no vault key involved. They carry no PHI (just a plan
+  // name + expiry), so reading them before/without PIN unlock is fine.
+  const [plan, setPlan] = useState('free')            // 'free'|'monthly'|'annual'|'lifetime'
+  const [entitledUntil, setEntitledUntil] = useState(null)
+  const [stripeCustomerId, setStripeCustomerId] = useState(null)
+
   // The live vault key never leaves memory. A ref so async sync helpers always
   // read the current key without being re-created on every render.
   const keyRef = useRef(null)
@@ -91,14 +99,25 @@ export function useCloud() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Copy the entitlement fields off a fetched profile row into state. Safe to
+  // call with null (a brand-new account has no row yet) — stays 'free'.
+  const applyEntitlement = useCallback((profile) => {
+    setPlan(profile?.plan || 'free')
+    setEntitledUntil(profile?.entitled_until || null)
+    setStripeCustomerId(profile?.stripe_customer_id || null)
+  }, [])
+
   // Decide which PIN step a freshly-authenticated user needs.
   const routeAfterAuth = useCallback(async (user) => {
     let profile = null
     try {
       const { data } = await supabase
-        .from('profiles').select('kdf_salt, encrypted_vault_key').eq('id', user.id).maybeSingle()
+        .from('profiles')
+        .select('kdf_salt, encrypted_vault_key, plan, entitled_until, stripe_customer_id')
+        .eq('id', user.id).maybeSingle()
       profile = data
     } catch { /* treat as no profile */ }
+    applyEntitlement(profile)
     if (!profile || !profile.encrypted_vault_key) {
       setPinMode('setup')            // brand-new account
     } else if (localPin.has() && localSalt.get()) {
@@ -107,7 +126,21 @@ export function useCloud() {
       setPinMode('recover')          // new device: unwrap the cloud key with the PIN
     }
     setStatus('need_pin')
-  }, [])
+  }, [applyEntitlement])
+
+  // Re-read entitlement for the signed-in user. Called after returning from
+  // Stripe checkout (the webhook may land a moment after the redirect, so the
+  // caller polls this a few times) and whenever we want the freshest plan.
+  const refreshEntitlement = useCallback(async () => {
+    const user = userRef.current
+    if (!user || !supabase) return
+    try {
+      const { data } = await supabase
+        .from('profiles').select('plan, entitled_until, stripe_customer_id')
+        .eq('id', user.id).maybeSingle()
+      applyEntitlement(data)
+    } catch { /* keep the last known entitlement */ }
+  }, [applyEntitlement])
 
   const sendCode = useCallback(async (rawEmail) => {
     const addr = (rawEmail || '').trim().toLowerCase()
@@ -235,6 +268,7 @@ export function useCloud() {
     keyRef.current = null; userRef.current = null
     localPin.clear(); localSalt.clear(); localEmail.clear()
     setEmail(''); setError(''); setPinMode('setup'); setStatus('signed_out')
+    setPlan('free'); setEntitledUntil(null); setStripeCustomerId(null)
     setBusy(false)
   }, [])
 
@@ -323,6 +357,11 @@ export function useCloud() {
     try { await supabase.storage.from('vault').remove(names.map((n) => `${user.id}/${n}`)) } catch { /* leaves orphan object; row already gone */ }
   }, [])
 
+  // The gate the Vault UI reads: lifetime, or a dated plan not yet expired.
+  // Mirrors public.is_entitled() in the SQL so client + server agree.
+  const entitled = plan === 'lifetime'
+    || ((plan === 'monthly' || plan === 'annual') && !!entitledUntil && new Date(entitledUntil).getTime() > Date.now())
+
   return {
     status, pinMode, email, error, busy,
     setEmail, setError,
@@ -332,6 +371,8 @@ export function useCloud() {
     pushItems, pullItems, deleteItem,
     uploadBytes, downloadBytes, removeBytes,
     hasKey: () => !!keyRef.current,
+    plan, entitled, entitledUntil, stripeCustomerId, refreshEntitlement,
+    userId: userRef.current?.id || null,
   }
 }
 
