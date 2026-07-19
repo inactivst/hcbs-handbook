@@ -25,8 +25,9 @@ const RC_IOS_KEY     = import.meta.env.VITE_REVENUECAT_IOS_KEY || ''       // ap
 const RC_ENTITLEMENT = import.meta.env.VITE_REVENUECAT_ENTITLEMENT || 'vault'
 // Product ids — must match the App Store Connect product ids AND be attached to
 // the "vault" entitlement in RevenueCat. Fallbacks if package-by-type lookup fails.
-const RC_PRODUCT_MONTHLY = import.meta.env.VITE_REVENUECAT_PRODUCT_MONTHLY || 'rightsbook_vault_monthly'
-const RC_PRODUCT_ANNUAL  = import.meta.env.VITE_REVENUECAT_PRODUCT_ANNUAL  || 'rightsbook_vault_annual'
+const RC_PRODUCT_MONTHLY  = import.meta.env.VITE_REVENUECAT_PRODUCT_MONTHLY  || 'rightsbook_vault_monthly'
+const RC_PRODUCT_ANNUAL   = import.meta.env.VITE_REVENUECAT_PRODUCT_ANNUAL   || 'rightsbook_vault_annual'
+const RC_PRODUCT_LIFETIME = import.meta.env.VITE_REVENUECAT_PRODUCT_LIFETIME || 'rightsbook_vault_lifetime'
 
 // ⚠️ STATICALLY imported (top of file), held in a module ref — NEVER lazy import().
 // A dynamic-import chunk never resolves inside the native WKWebView, so the await
@@ -90,9 +91,10 @@ export async function rcLoadPricing(appUserId) {
   const { current } = await P.getOfferings()
   const pkgFor = (type, id) =>
     current?.[type] || current?.availablePackages?.find((p) => p.product?.identifier === id)
-  const monthly = pkgFor('monthly', RC_PRODUCT_MONTHLY)?.product || null
-  const annual  = pkgFor('annual',  RC_PRODUCT_ANNUAL )?.product || null
-  if (!monthly && !annual) return null
+  const monthly  = pkgFor('monthly',  RC_PRODUCT_MONTHLY )?.product || null
+  const annual   = pkgFor('annual',   RC_PRODUCT_ANNUAL  )?.product || null
+  const lifetime = pkgFor('lifetime', RC_PRODUCT_LIFETIME)?.product || null
+  if (!monthly && !annual && !lifetime) return null
 
   // Trial copy is gated on THIS Apple ID's eligibility, not on the offer existing:
   // Apple grants the intro once per subscription group ever, so a returning
@@ -112,8 +114,9 @@ export async function rcLoadPricing(appUserId) {
     : 0
 
   return {
-    monthly: monthly ? { priceString: monthly.priceString } : null,
-    annual:  annual  ? { priceString: annual.priceString, savingsPct, trialDays } : null,
+    monthly:  monthly  ? { priceString: monthly.priceString } : null,
+    annual:   annual   ? { priceString: annual.priceString, savingsPct, trialDays } : null,
+    lifetime: lifetime ? { priceString: lifetime.priceString } : null,
   }
 }
 
@@ -131,9 +134,11 @@ export async function rcCheckEntitlement(appUserId) {
 export async function rcPurchase(plan, appUserId) {
   const P = (await rcConfigure(appUserId)) ? _rcPurchases : null
   if (!P) throw new Error('In-app purchase isn’t available on this build.')
-  const wantId = plan === 'annual' ? RC_PRODUCT_ANNUAL : RC_PRODUCT_MONTHLY
+  const wantId = plan === 'annual' ? RC_PRODUCT_ANNUAL
+    : plan === 'lifetime' ? RC_PRODUCT_LIFETIME : RC_PRODUCT_MONTHLY
   const { current } = await P.getOfferings()
-  const pkg = (plan === 'annual' ? current?.annual : current?.monthly)
+  const pkg = (plan === 'annual' ? current?.annual
+    : plan === 'lifetime' ? current?.lifetime : current?.monthly)
     || current?.availablePackages?.find((p) => p.product?.identifier === wantId)
   if (!pkg) throw new Error('That plan isn’t available right now. Please try again.')
   const { customerInfo } = await P.purchasePackage({ aPackage: pkg })

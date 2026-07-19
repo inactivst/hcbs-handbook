@@ -3559,6 +3559,11 @@ function Paywall({ cloud, onNativePaid }) {
     ? (pricing?.annual?.savingsPct > 0 ? t('paySavePct', { pct: pricing.annual.savingsPct }) : '')
     : t('paySaveChip')
   const trialDays = nativeIap ? (pricing?.annual?.trialDays || 0) : 0
+  // One-time lifetime unlock — native only (web one-time waits for Google Play +
+  // web billing). Quiet "or pay once" option under the subscription buttons.
+  const lifetimeLabel = pricing?.lifetime
+    ? t('payLifetimePriced', { price: pricing.lifetime.priceString })
+    : t('payLifetimeGeneric')
 
   return (
     <div>
@@ -3587,6 +3592,13 @@ function Paywall({ cloud, onNativePaid }) {
       <button disabled={!!busy} onClick={() => start('monthly')} style={{ ...cloudBtn('secondary'), marginTop: 10, opacity: busy && busy !== 'monthly' ? 0.6 : 1 }}>
         {busy === 'monthly' ? t('payStarting') : monthlyLabel}
       </button>
+
+      {/* One-time lifetime unlock — quiet tertiary option, native only. */}
+      {nativeIap && (
+        <button disabled={!!busy} onClick={() => start('lifetime')} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: C.sub, marginTop: 12, padding: 4, opacity: busy && busy !== 'lifetime' ? 0.6 : 1 }}>
+          {busy === 'lifetime' ? t('payStarting') : lifetimeLabel}
+        </button>
+      )}
 
       {trialDays > 0 && (
         <div style={{ fontSize: 12, color: C.accent, fontWeight: 600, textAlign: 'center', margin: '10px 2px 0' }}>{t('payTrialLine', { days: trialDays })}</div>

@@ -45,10 +45,15 @@ $$;
 --
 create or replace function public.guard_entitlement_columns()
 returns trigger language plpgsql as $$
+declare claims_role text;
 begin
-  -- service_role (the webhook) is allowed to change entitlement; anyone else is
-  -- silently held to the old values, so a malicious client can't self-upgrade.
-  if current_setting('request.jwt.claims', true)::jsonb ->> 'role' is distinct from 'service_role' then
+  -- PostgREST stamps a role claim on every CLIENT request (authenticated/anon/
+  -- service_role). A NULL claim means a trusted DIRECT connection (SQL editor,
+  -- service key, admin comp), not a client. So: allow service_role and direct
+  -- connections; silently hold everyone else to the old values so a malicious
+  -- client can't self-upgrade.
+  claims_role := current_setting('request.jwt.claims', true)::jsonb ->> 'role';
+  if claims_role is not null and claims_role <> 'service_role' then
     new.plan               := old.plan;
     new.entitled_until     := old.entitled_until;
     new.stripe_customer_id := old.stripe_customer_id;
@@ -56,6 +61,10 @@ begin
   return new;
 end;
 $$;
+
+-- To comp an account by email (SQL editor or admin connection):
+--   update public.profiles set plan = 'lifetime', entitled_until = null
+--   where id = (select id from auth.users where email = 'someone@example.com');
 
 drop trigger if exists guard_entitlement on public.profiles;
 create trigger guard_entitlement
