@@ -43,6 +43,17 @@
       body { touch-action: manipulation; -webkit-touch-callout: none; }
       button, nav, a { -webkit-user-select: none; user-select: none; }
       input, textarea, [contenteditable] { -webkit-touch-callout: default; -webkit-user-select: text; user-select: text; }
+      /* iOS date/time inputs: the value lives in a pseudo-element that (a) has
+         zero height when the field is EMPTY, collapsing the field to a thin pill,
+         and (b) can wrap to two lines when narrow, growing the field tall. Pin one
+         left-aligned text line so the field matches its text-input siblings
+         whether empty, filled, or narrow. */
+      input[type="date"]::-webkit-date-and-time-value,
+      input[type="time"]::-webkit-date-and-time-value,
+      input[type="datetime-local"]::-webkit-date-and-time-value { min-height: 1.35em; white-space: nowrap; text-align: left; }
+      input[type="date"]::-webkit-datetime-edit,
+      input[type="time"]::-webkit-datetime-edit,
+      input[type="datetime-local"]::-webkit-datetime-edit { white-space: nowrap; overflow: hidden; }
       /* Placeholders pinned to one grey so every hint reads the same (browser defaults vary). */
       input::placeholder, textarea::placeholder { color: #8A857D; opacity: 1; }
       input::-webkit-input-placeholder, textarea::-webkit-input-placeholder { color: #8A857D; }
