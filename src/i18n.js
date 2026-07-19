@@ -198,6 +198,9 @@ const STRINGS = {
     // Vault / incident log
     navVault: 'Vault',
     vaultHubSub: 'Private and encrypted, only you can open it.',
+    vaultLapsedSub: 'Your records are safe. View and export them anytime.',
+    vaultLapsedBanner: 'Your subscription ended, so adding and syncing are paused — but everything you already saved stays here to view and export.',
+    vaultResubscribe: 'Resubscribe to add & sync',
     countSaved: '{n} saved',
     tileEmpty: 'Nothing yet',
     tilePacketSub: 'Build a complaint',
@@ -651,6 +654,9 @@ const STRINGS = {
     // Vault / incident log
     navVault: 'Bóveda',
     vaultHubSub: 'Privado y cifrado, solo tú puedes abrirlo.',
+    vaultLapsedSub: 'Tus registros están seguros. Puedes verlos y exportarlos cuando quieras.',
+    vaultLapsedBanner: 'Tu suscripción terminó, así que agregar y sincronizar están en pausa — pero todo lo que ya guardaste queda aquí para ver y exportar.',
+    vaultResubscribe: 'Vuelve a suscribirte para agregar y sincronizar',
     countSaved: '{n} guardados',
     tileEmpty: 'Nada aún',
     tilePacketSub: 'Crear una queja',
@@ -1104,6 +1110,9 @@ const STRINGS = {
     // Vault / incident log
     navVault: 'Vault',
     vaultHubSub: 'Pribado at naka-encrypt, ikaw lang ang makakabukas nito.',
+    vaultLapsedSub: 'Ligtas ang iyong mga record. Tingnan at i-export mo kahit kailan.',
+    vaultLapsedBanner: 'Natapos na ang iyong subscription, kaya naka-pause ang pagdagdag at pag-sync — pero lahat ng na-save mo na ay nananatili rito para tingnan at i-export.',
+    vaultResubscribe: 'Mag-subscribe ulit para magdagdag at mag-sync',
     countSaved: '{n} naka-save',
     tileEmpty: 'Wala pa',
     tilePacketSub: 'Gumawa ng reklamo',

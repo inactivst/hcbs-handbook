@@ -2921,7 +2921,7 @@ function Lightbox({ photos, index = 0, cloud, onClose, onDelete }) {
 // Documents & photos - a photo-gallery grid (like the Book). Images are
 // thumbnails that open a full-screen Lightbox; PDFs open in a new tab. Incident
 // photos land here too (they share this store), so it's one place for everything.
-function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded }) {
+function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded, readOnly }) {
   const t = useT()
   const [error, setError] = useState('')
   const [lightbox, setLightbox] = useState(null) // index into `images`
@@ -2952,9 +2952,11 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded }) {
       {!embedded && <SectionTitle>{t('docsTitle')}</SectionTitle>}
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('docsSub')}</div>
       <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple onChange={onPick} style={{ display: 'none' }} />
-      <button disabled={busy} onClick={() => inputRef.current?.click()} style={{ ...cloudBtn('primary'), marginBottom: 8, opacity: busy ? 0.6 : 1 }}>
-        {busy ? t('docUploading') : t('addDoc')}
-      </button>
+      {!readOnly && (
+        <button disabled={busy} onClick={() => inputRef.current?.click()} style={{ ...cloudBtn('primary'), marginBottom: 8, opacity: busy ? 0.6 : 1 }}>
+          {busy ? t('docUploading') : t('addDoc')}
+        </button>
+      )}
       <CloudNote error={error} />
       {docs.length === 0 ? (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55, marginTop: 6 }}>
@@ -2981,16 +2983,18 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded }) {
                   <span style={{ display: 'block', fontSize: 12, color: C.sub, marginTop: 2 }}>{doc.at} · {formatBytes(doc.size)}</span>
                 </span>
               </button>
-              <button onClick={() => onRemove(doc)} aria-label={t('delete')}
-                style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, background: 'transparent', border: 'none', color: C.sub, cursor: 'pointer' }}>
-                <IcTrash size={16} />
-              </button>
+              {!readOnly && (
+                <button onClick={() => onRemove(doc)} aria-label={t('delete')}
+                  style={{ flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, background: 'transparent', border: 'none', color: C.sub, cursor: 'pointer' }}>
+                  <IcTrash size={16} />
+                </button>
+              )}
             </div>
           ))}
         </>
       )}
       {lightbox !== null && (
-        <Lightbox photos={images} index={lightbox} cloud={cloud} onClose={() => setLightbox(null)} onDelete={(doc) => onRemove(doc)} />
+        <Lightbox photos={images} index={lightbox} cloud={cloud} onClose={() => setLightbox(null)} onDelete={readOnly ? undefined : (doc) => onRemove(doc)} />
       )}
     </>
   )
@@ -3003,7 +3007,7 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded }) {
 // sits above the keyboard on its own - device-test the lower fields (Where/Who)
 // after any change here. Photos are stored through the shared docs store, so they
 // also appear in the Documents gallery.
-function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud }) {
+function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud, readOnly }) {
   const t = useT()
   const [at, setAt] = useState(initial?.at || todayISO())
   const [what, setWhat] = useState(initial?.what || '')
@@ -3036,20 +3040,20 @@ function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud }) {
   return (
     <>
       <label style={{ ...fieldLabel, marginTop: 0 }}>{t('incWhen')}</label>
-      <input type="date" value={at} onChange={(e) => setAt(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="date" value={at} onChange={(e) => setAt(e.target.value)} disabled={readOnly} style={{ ...inputStyle, fontSize: 16 }} />
       <label style={fieldLabel}>{t('incWhat')}</label>
       <div>
         {/* Textarea wrapped in a block div (iOS flex-item collapse). */}
         <textarea
-          value={what} onChange={(e) => setWhat(e.target.value)} rows={4}
+          value={what} onChange={(e) => setWhat(e.target.value)} rows={4} readOnly={readOnly}
           placeholder={t('incWhatPh')}
           style={{ ...inputStyle, fontSize: 16, resize: 'none', lineHeight: 1.5 }}
         />
       </div>
       <label style={fieldLabel}>{t('incWhere')}</label>
-      <input type="text" value={where} onChange={(e) => setWhere(e.target.value)} placeholder={t('incWherePh')} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="text" value={where} onChange={(e) => setWhere(e.target.value)} readOnly={readOnly} placeholder={t('incWherePh')} style={{ ...inputStyle, fontSize: 16 }} />
       <label style={fieldLabel}>{t('incWho')}</label>
-      <input type="text" value={who} onChange={(e) => setWho(e.target.value)} placeholder={t('incWhoPh')} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="text" value={who} onChange={(e) => setWho(e.target.value)} readOnly={readOnly} placeholder={t('incWhoPh')} style={{ ...inputStyle, fontSize: 16 }} />
 
       <label style={fieldLabel}>{t('incPhotos')}</label>
       <input ref={photoInput} type="file" accept="image/*" multiple onChange={onPickPhoto} style={{ display: 'none' }} />
@@ -3060,30 +3064,36 @@ function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud }) {
               <button onClick={() => setLb(idx)} aria-label={t('photo')} style={{ padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'block' }}>
                 <DocThumb doc={doc} cloud={cloud} size={66} radius={12} />
               </button>
-              <button onClick={() => removePhoto(doc)} aria-label={t('delete')}
-                style={{ position: 'absolute', top: -7, right: -7, width: 24, height: 24, borderRadius: '50%', border: '2px solid #fff', background: C.danger, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(43,42,40,0.3)' }}>
-                <IcX size={13} />
-              </button>
+              {!readOnly && (
+                <button onClick={() => removePhoto(doc)} aria-label={t('delete')}
+                  style={{ position: 'absolute', top: -7, right: -7, width: 24, height: 24, borderRadius: '50%', border: '2px solid #fff', background: C.danger, color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(43,42,40,0.3)' }}>
+                  <IcX size={13} />
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
-      <button disabled={vaultDocs.busy} onClick={() => photoInput.current?.click()} style={{ ...cloudBtn('secondary'), opacity: vaultDocs.busy ? 0.6 : 1 }}>
-        {vaultDocs.busy ? t('docUploading') : t('addPhoto')}
-      </button>
+      {!readOnly && (
+        <button disabled={vaultDocs.busy} onClick={() => photoInput.current?.click()} style={{ ...cloudBtn('secondary'), opacity: vaultDocs.busy ? 0.6 : 1 }}>
+          {vaultDocs.busy ? t('docUploading') : t('addPhoto')}
+        </button>
+      )}
 
       <CloudNote error={error} />
-      <button
-        onClick={() => {
-          if (!what.trim()) { setError(t('incNeedWhat')); return }
-          onSave({ ...(initial || {}), at: at || todayISO(), what: what.trim(), where: where.trim(), who: who.trim(), photoIds })
-          onCancel()
-        }}
-        style={{ ...cloudBtn('primary'), marginTop: 10 }}
-      >
-        {t('save')}
-      </button>
-      <button onClick={onCancel} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('cancel')}</button>
+      {!readOnly && (
+        <button
+          onClick={() => {
+            if (!what.trim()) { setError(t('incNeedWhat')); return }
+            onSave({ ...(initial || {}), at: at || todayISO(), what: what.trim(), where: where.trim(), who: who.trim(), photoIds })
+            onCancel()
+          }}
+          style={{ ...cloudBtn('primary'), marginTop: 10 }}
+        >
+          {t('save')}
+        </button>
+      )}
+      <button onClick={onCancel} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t(readOnly ? 'close' : 'cancel')}</button>
       {lb !== null && <Lightbox photos={photoDocs} index={lb} cloud={cloud} onClose={() => setLb(null)} />}
     </>
   )
@@ -3091,7 +3101,7 @@ function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud }) {
 
 // Denial-notice / deadline form (add/edit), nested inside the Deadlines sheet.
 // Same iOS keyboard caveat as IncidentForm - device-test fields above the fold.
-function DeadlineForm({ initial, onSave, onCancel, isCA }) {
+function DeadlineForm({ initial, onSave, onCancel, isCA, readOnly }) {
   const t = useT()
   const [notice, setNotice] = useState(initial?.notice || todayISO())
   // The 60/90-day tracks are California law - only offer them in CA. Everywhere
@@ -3117,36 +3127,38 @@ function DeadlineForm({ initial, onSave, onCancel, isCA }) {
         </>
       )}
       <label style={isCA ? fieldLabel : { ...fieldLabel, marginTop: 0 }}>{t('dlNotice')}</label>
-      <input type="date" value={notice} onChange={(e) => setNotice(e.target.value)} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="date" value={notice} onChange={(e) => setNotice(e.target.value)} disabled={readOnly} style={{ ...inputStyle, fontSize: 16 }} />
       <label style={fieldLabel}>{t('dlLabel')}</label>
-      <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} placeholder={t('dlLabelPh')} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} readOnly={readOnly} placeholder={t('dlLabelPh')} style={{ ...inputStyle, fontSize: 16 }} />
       {showDays && (
         <>
           <label style={fieldLabel}>{t('dlDays')}</label>
           <input
-            type="text" inputMode="numeric" value={days} maxLength={3}
+            type="text" inputMode="numeric" value={days} maxLength={3} readOnly={readOnly}
             onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))}
             style={{ ...inputStyle, fontSize: 16 }}
           />
         </>
       )}
       <CloudNote error={error} />
-      <button
-        onClick={() => {
-          if (!notice) { setError(t('dlNeedNotice')); return }
-          const effTrack = isCA ? track : 'custom'
-          onSave({
-            ...(initial || {}),
-            notice, track: effTrack, label: label.trim(),
-            days: effTrack === 'custom' ? Math.max(1, Number(days) || 30) : undefined,
-          })
-          onCancel()
-        }}
-        style={{ ...cloudBtn('primary'), marginTop: 10 }}
-      >
-        {t('save')}
-      </button>
-      <button onClick={onCancel} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t('cancel')}</button>
+      {!readOnly && (
+        <button
+          onClick={() => {
+            if (!notice) { setError(t('dlNeedNotice')); return }
+            const effTrack = isCA ? track : 'custom'
+            onSave({
+              ...(initial || {}),
+              notice, track: effTrack, label: label.trim(),
+              days: effTrack === 'custom' ? Math.max(1, Number(days) || 30) : undefined,
+            })
+            onCancel()
+          }}
+          style={{ ...cloudBtn('primary'), marginTop: 10 }}
+        >
+          {t('save')}
+        </button>
+      )}
+      <button onClick={onCancel} style={{ ...cloudBtn('secondary'), marginTop: 8 }}>{t(readOnly ? 'close' : 'cancel')}</button>
     </>
   )
 }
@@ -3632,7 +3644,14 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
   const [editing, setEditing] = useState(null) // null | 'new' | incident
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const [packetError, setPacketError] = useState('')
+  const [showPaywall, setShowPaywall] = useState(false) // read-only user tapped Resubscribe
   const ready = cloud.status === 'ready'
+  // LAPSE-READ-SAFE: a signed-in user whose plan lapsed keeps VIEW + EXPORT access
+  // to records they already saved — we never lock someone out of their own evidence.
+  // Only NEW writes (add/edit/delete) and sync gate. A brand-new user with no data
+  // sees the full paywall instead (nothing to protect yet).
+  const hasVaultData = incidents.length > 0 || deadlines.length > 0 || vaultDocs.docs.length > 0
+  const readOnly = ready && !entitled
 
   const makePacket = () => {
     setPacketError('')
@@ -3671,7 +3690,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
     <SwipeableRow
       key={inc.id}
       onTap={() => setEditing(inc)}
-      actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => deleteIncident(inc) }]}
+      actions={readOnly ? [] : [{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => deleteIncident(inc) }]}
     >
       <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
         <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
@@ -3685,7 +3704,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
             </div>
           )}
         </div>
-        {!IS_TOUCH && (
+        {!IS_TOUCH && !readOnly && (
           <button
             onClick={(e) => { e.stopPropagation(); deleteIncident(inc) }}
             aria-label={t('delete')}
@@ -3709,7 +3728,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
       <SwipeableRow
         key={rec.id}
         onTap={() => setEditingDl(rec)}
-        actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDeleteDeadline(rec.id) }]}
+        actions={readOnly ? [] : [{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDeleteDeadline(rec.id) }]}
       >
         <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
           <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
@@ -3722,7 +3741,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
               <div style={{ fontSize: 12, color: C.sub, marginTop: 2, lineHeight: 1.45 }}>{t('dlAidPending', { date: isoToLocale(aidBy) })}</div>
             )}
           </div>
-          {!IS_TOUCH && (
+          {!IS_TOUCH && !readOnly && (
             <button
               onClick={(e) => { e.stopPropagation(); onDeleteDeadline(rec.id) }}
               aria-label={t('delete')}
@@ -3756,11 +3775,11 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
     )
   }
 
-  // Signed in + unlocked, but no active subscription: the Vault tools are the
-  // paid tier, so show the paywall in place of the hub. The rights chat and
-  // Rights hub stay free; only this personal-records area is gated. `entitled`
-  // is web (Stripe/Supabase) OR native (Apple/RevenueCat) — either unlocks.
-  if (!entitled) {
+  // Signed in + unlocked, no active subscription, AND nothing saved yet: full
+  // paywall (the Vault tools are the paid tier). A lapsed user WITH saved records
+  // instead falls through to the read-only hub below, so their evidence stays
+  // viewable/exportable. `entitled` is web (Stripe/Supabase) OR native (RC).
+  if (!entitled && !hasVaultData) {
     return (
       <Page>
         <PageTitle>{t('navVault')}</PageTitle>
@@ -3777,26 +3796,41 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
     <>
       <Page>
         <PageTitle>{t('navVault')}</PageTitle>
-        <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('vaultHubSub')}</div>
+        <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{readOnly ? t('vaultLapsedSub') : t('vaultHubSub')}</div>
+        {/* Lapsed: records stay viewable/exportable; a calm banner offers to resume. */}
+        {readOnly && (
+          <div style={{ background: C.accentSoft, border: `1px solid ${C.accent}33`, borderRadius: 14, padding: '13px 14px', margin: '0 0 14px' }}>
+            <div style={{ fontSize: 13.5, color: C.ink, lineHeight: 1.5, marginBottom: 10 }}>{t('vaultLapsedBanner')}</div>
+            <button onClick={() => setShowPaywall(true)} style={{ ...cloudBtn('primary'), padding: '10px 14px', fontSize: 14 }}>{t('vaultResubscribe')}</button>
+          </div>
+        )}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <VaultTile icon={<IcClipboard size={22} />} label={t('incidentLog')} sub={countText(incidents.length)} onClick={() => setView('incidents')} />
           <VaultTile icon={<IcClock size={22} />} label={t('appealDeadlines')} sub={countText(deadlines.length)} onClick={() => setView('deadlines')} />
-          <VaultTile icon={<IcMail size={22} />} label={t('letters')} sub={t('ltTileSub')} onClick={() => setView('letters')} />
+          {/* Letters CREATE new documents, so hide the tile while read-only. */}
+          {!readOnly && <VaultTile icon={<IcMail size={22} />} label={t('letters')} sub={t('ltTileSub')} onClick={() => setView('letters')} />}
           <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setView('documents')} />
           <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setView('packet')} />
         </div>
       </Page>
+
+      {/* Read-only user chose Resubscribe → the paywall over the hub. */}
+      {showPaywall && (
+        <Modal onClose={() => setShowPaywall(false)} title={t('payTitle')}>
+          <Paywall cloud={cloud} onNativePaid={() => { setShowPaywall(false); onNativePaid?.() }} />
+        </Modal>
+      )}
 
       {view === 'incidents' && (
         <Modal onClose={closeSheet} title={editing ? t(editing === 'new' ? 'addIncident' : 'editIncident') : t('incidentLog')}>
           {editing ? (
             <>
               <SheetBack label={t('incidentLog')} onBack={() => setEditing(null)} />
-              <IncidentForm initial={editing === 'new' ? null : editing} onSave={onSaveIncident} onCancel={() => setEditing(null)} vaultDocs={vaultDocs} cloud={cloud} />
+              <IncidentForm initial={editing === 'new' ? null : editing} onSave={onSaveIncident} onCancel={() => setEditing(null)} vaultDocs={vaultDocs} cloud={cloud} readOnly={readOnly} />
             </>
           ) : (
             <>
-              <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>
+              {!readOnly && <button onClick={() => setEditing('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addIncident')}</button>}
               {incidents.length === 0 ? emptyCard(t('vaultEmptyList')) : incidents.map(incidentRow)}
             </>
           )}
@@ -3808,12 +3842,12 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
           {editingDl ? (
             <>
               <SheetBack label={t('appealDeadlines')} onBack={() => setEditingDl(null)} />
-              <DeadlineForm initial={editingDl === 'new' ? null : editingDl} onSave={onSaveDeadline} onCancel={() => setEditingDl(null)} isCA={isCA} />
+              <DeadlineForm initial={editingDl === 'new' ? null : editingDl} onSave={onSaveDeadline} onCancel={() => setEditingDl(null)} isCA={isCA} readOnly={readOnly} />
             </>
           ) : (
             <>
               <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('deadlineSub')}</div>
-              <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>
+              {!readOnly && <button onClick={() => setEditingDl('new')} style={{ ...cloudBtn('primary'), marginBottom: 14 }}>{t('addDeadline')}</button>}
               {deadlines.length === 0 ? emptyCard(t('vaultEmptyDl')) : deadlines.map(deadlineRow)}
             </>
           )}
@@ -3822,7 +3856,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
 
       {view === 'documents' && (
         <Modal onClose={closeSheet} title={t('docsTitle')}>
-          <DocsSection cloud={cloud} docs={vaultDocs.docs} busy={vaultDocs.busy} onAdd={vaultDocs.add} onRemove={vaultDocs.remove} embedded />
+          <DocsSection cloud={cloud} docs={vaultDocs.docs} busy={vaultDocs.busy} onAdd={vaultDocs.add} onRemove={vaultDocs.remove} embedded readOnly={readOnly} />
         </Modal>
       )}
 
