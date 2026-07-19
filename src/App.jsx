@@ -3645,6 +3645,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
   const [editingDl, setEditingDl] = useState(null) // null | 'new' | deadline
   const [packetError, setPacketError] = useState('')
   const [showPaywall, setShowPaywall] = useState(false) // read-only user tapped Resubscribe
+  const kbInset = useKeyboardInset() // room so a low field (sign-in email, PIN) can rise above the keyboard
   const ready = cloud.status === 'ready'
   // LAPSE-READ-SAFE: a signed-in user whose plan lapsed keeps VIEW + EXPORT access
   // to records they already saved — we never lock someone out of their own evidence.
@@ -3668,7 +3669,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
   }
 
   const Page = ({ children }) => (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `10px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `10px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch', marginBottom: kbInset, transition: 'margin-bottom 0.2s ease' }}>
       {children}
     </div>
   )
