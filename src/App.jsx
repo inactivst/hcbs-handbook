@@ -375,19 +375,20 @@ function useGlobalFieldRecenter() {
       const visibleBottom = visTop + visHeight
       const rect = el.getBoundingClientRect()
       const margin = 20
-      const comfyTop = visTop + Math.min(visHeight * 0.30, 200)
       const obscured = rect.bottom > visibleBottom - margin
-      const tooLow = rect.top > visTop + visHeight * 0.55
       const tooHigh = rect.top < visTop + margin
-      if (!obscured && !tooLow && !tooHigh) return
+      // A fully VISIBLE field stays PUT - no comfy-line glide (GuestBook 7/20: the
+      // glide walked the page under your finger on every focus hop through a stack
+      // of visible fields). Act only when the field is genuinely obscured or
+      // clipped off the top, and move by the MINIMUM that clears it.
+      if (!obscured && !tooHigh) return
       const sc = scrollableAncestor(el)
-      // Never aim above the field's own scroll container top (otherwise the delta
-      // overshoots and flings the field off the top).
-      const targetTop = sc ? Math.max(comfyTop, sc.getBoundingClientRect().top + margin) : comfyTop
-      const delta = rect.top - targetTop
+      const delta = obscured
+        ? Math.min(rect.bottom - (visibleBottom - margin), Math.max(0, rect.top - (visTop + margin)))
+        : rect.top - (visTop + margin)
       if (Math.abs(delta) < 8) return
       if (sc) sc.scrollBy({ top: delta, behavior: smooth ? 'smooth' : 'auto' })
-      else el.scrollIntoView({ block: 'center', behavior: smooth ? 'smooth' : 'auto' })
+      else el.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' })
     }
     // FOCUS cascade: one smooth glide after the keyboard starts settling, then
     // instant idempotent top-ups as it finishes / transitions land. RESIZE top-up:
