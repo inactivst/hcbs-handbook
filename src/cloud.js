@@ -48,6 +48,23 @@ const parseWrapped = (v) => {
   try { return JSON.parse(v) } catch { return null }
 }
 
+// Which of `list` still needs writing, given `marks` (`${kind}:${id}` -> the JSON
+// last accepted by the server). Returns [mark, json, item] triples, in list order.
+// Pure and exported so the delta rule can be tested without a session or a network:
+// getting it wrong either re-uploads everything (the bug this replaced) or, far
+// worse, silently drops an edit.
+export function selectDirty(kind, list, marks) {
+  const out = []
+  for (const item of list || []) {
+    if (!isUuid(item?.id)) continue // fallback non-uuid ids stay device-local
+    const json = JSON.stringify(item)
+    const mark = `${kind}:${item.id}`
+    if (marks.get(mark) === json) continue // unchanged since the last accepted write
+    out.push([mark, json, item])
+  }
+  return out
+}
+
 // status: 'off' (no cloud configured) | 'signed_out' | 'code_sent' | 'need_pin' | 'ready'
 // pinMode (while 'need_pin'): 'setup' (first account) | 'unlock' (known device) | 'recover' (new device)
 export function useCloud() {
@@ -69,6 +86,14 @@ export function useCloud() {
   // read the current key without being re-created on every render.
   const keyRef = useRef(null)
   const userRef = useRef(null)
+
+  // What each row looked like the last time the server ACCEPTED it: `${kind}:${id}`
+  // -> the item's JSON. Without this, `pushItems` re-encrypted and re-uploaded the
+  // whole collection on every keystroke-sized change - a new answer re-sent all 50
+  // conversations, and every unlock re-sent the entire vault, because the pull that
+  // fills state also trips the push effect. Entries are only recorded after a
+  // successful write, so an offline failure stays dirty and retries.
+  const pushedRef = useRef(new Map())
 
   // On mount, pick up an existing Supabase session (the user may already be
   // signed in from a previous visit) and route to the right PIN step.
@@ -228,6 +253,9 @@ export function useCloud() {
   // so the next unlock is a quick PIN entry.
   const lock = useCallback(() => {
     keyRef.current = null
+    // Forget what was clean: the next unlock re-seeds it from the pull, and holding
+    // marks across a lock could hide a change another device made in between.
+    pushedRef.current.clear()
     setPinMode(localPin.has() ? 'unlock' : 'setup')
     setStatus(userRef.current ? 'need_pin' : 'signed_out')
   }, [])
@@ -266,6 +294,7 @@ export function useCloud() {
     setBusy(true)
     try { await supabase?.auth.signOut() } catch { /* ignore */ }
     keyRef.current = null; userRef.current = null
+    pushedRef.current.clear()
     localPin.clear(); localSalt.clear(); localEmail.clear()
     setEmail(''); setError(''); setPinMode('setup'); setStatus('signed_out')
     setPlan('free'); setEntitledUntil(null); setStripeCustomerId(null)
@@ -274,23 +303,43 @@ export function useCloud() {
 
   const restart = useCallback(() => { setError(''); setStatus('signed_out'); setPinMode('setup') }, [])
 
+  // The caller's Supabase access token, for the payment endpoints. They authenticate
+  // with this and derive the user id server-side, rather than trusting a userId in
+  // the request body (which anyone could set to someone else's).
+  const getAccessToken = useCallback(async () => {
+    if (!supabase) return null
+    try {
+      const { data } = await supabase.auth.getSession()
+      return data?.session?.access_token || null
+    } catch { return null }
+  }, [])
+
   // ─── Vault item sync (E2E) ──────────────────────────────────────────────────
   // Every vault record (conversation history, incident log entries, …) is one
   // encrypted row in vault_items, keyed by the record's own UUID so upserts are
   // idempotent per device and `kind` separates the collections.
+  // Writes ONLY the rows whose contents actually changed (see pushedRef). Callers
+  // still hand over the whole collection - the diff happens here, so no caller has
+  // to track dirty state.
   const pushItems = useCallback(async (kind, list) => {
     const key = keyRef.current, user = userRef.current
     if (!key || !user || !supabase || !Array.isArray(list)) return
+    const staged = selectDirty(kind, list, pushedRef.current)
+    if (!staged.length) return
     const rows = []
-    for (const item of list) {
-      if (!isUuid(item?.id)) continue // fallback non-uuid ids stay device-local
+    for (const [, json, item] of staged) {
       rows.push({
         id: item.id, user_id: user.id, kind,
-        ciphertext: JSON.stringify(await encryptStr(JSON.stringify(item), key)),
+        ciphertext: JSON.stringify(await encryptStr(json, key)),
       })
     }
-    if (!rows.length) return
-    try { await supabase.from('vault_items').upsert(rows) } catch { /* offline: retries next change */ }
+    try {
+      const { error } = await supabase.from('vault_items').upsert(rows)
+      if (error) throw error
+      // Mark clean only now. If the upsert failed we leave these dirty so the next
+      // change (or unlock) retries them instead of silently dropping an edit.
+      for (const [mark, json] of staged) pushedRef.current.set(mark, json)
+    } catch { /* offline: still dirty, retries next change */ }
   }, [])
 
   const pullItems = useCallback(async (kind) => {
@@ -308,7 +357,12 @@ export function useCloud() {
         const plain = await decryptStr(JSON.parse(row.ciphertext), key)
         if (!plain) continue
         const item = JSON.parse(plain)
-        if (item && item.id) out.push(item)
+        if (!item || !item.id) continue
+        out.push(item)
+        // Seed the clean-marks with what the server already holds, normalised the
+        // same way push does. This is what stops an unlock from immediately
+        // re-uploading everything it just downloaded.
+        pushedRef.current.set(`${kind}:${item.id}`, JSON.stringify(item))
       } catch { /* skip an unreadable row */ }
     }
     return out
@@ -319,6 +373,11 @@ export function useCloud() {
   const deleteItem = useCallback(async (id) => {
     const user = userRef.current
     if (!user || !supabase || !isUuid(id)) return
+    // Drop every clean-mark for this id (the kind isn't passed in) so that if the
+    // same id is ever written again it is treated as new rather than skipped.
+    for (const mark of pushedRef.current.keys()) {
+      if (mark.endsWith(`:${id}`)) pushedRef.current.delete(mark)
+    }
     try { await supabase.from('vault_items').delete().eq('id', id) } catch { /* offline: row lingers but stays deleted locally */ }
   }, [])
 
@@ -365,7 +424,7 @@ export function useCloud() {
   return {
     status, pinMode, email, error, busy,
     setEmail, setError,
-    sendCode, verifyCode, submitPin, lock, signOut, restart,
+    sendCode, verifyCode, submitPin, lock, signOut, restart, getAccessToken,
     lockDelay, setLockDelay,
     pushConversations, pullConversations,
     pushItems, pullItems, deleteItem,

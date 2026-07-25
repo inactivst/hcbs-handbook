@@ -14,12 +14,22 @@ import { supabaseAdmin } from './_stripe.js'
 const AUTH = process.env.REVENUECAT_WEBHOOK_AUTH || ''
 
 // Map a RevenueCat product identifier to our plan name (ids from IOS_SETUP.md).
+// `lifetime` MUST be checked: the one-time non-consumable carries no expiry, so if
+// it fell through to 'monthly' the row would read plan='monthly' + entitled_until=null,
+// which both the client gate and is_entitled() score as NOT entitled - locking a
+// paying customer out of the Vault everywhere except the device holding the receipt.
 function planForProduct(productId) {
   const id = String(productId || '')
+  if (/lifetime|forever|permanent/i.test(id)) return 'lifetime'
   if (/annual|year/i.test(id)) return 'annual'
   if (/month/i.test(id)) return 'monthly'
   return 'monthly'
 }
+
+// RevenueCat also sends events for anonymous ids ($RCAnonymousID:…) that never
+// signed in. Those aren't Supabase user ids, so the update would throw on the uuid
+// cast and RC would retry the same event forever. Ack and drop them instead.
+const isUuid = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(s || ''))
 
 const safeEqual = (a, b) => {
   const x = Buffer.from(String(a)); const y = Buffer.from(String(b))
@@ -36,7 +46,7 @@ export default async function handler(req, res) {
 
   const event = req.body?.event || req.body
   const uid = event?.app_user_id
-  if (!uid) return res.status(200).json({ received: true }) // anonymous / pre-login events: nothing to attribute
+  if (!isUuid(uid)) return res.status(200).json({ received: true }) // anonymous / pre-login events: nothing to attribute
 
   // RevenueCat event types: INITIAL_PURCHASE, RENEWAL, PRODUCT_CHANGE, UNCANCELLATION
   // keep entitlement active; CANCELLATION/EXPIRATION/BILLING_ISSUE end it. We trust
@@ -48,9 +58,14 @@ export default async function handler(req, res) {
   const stillValid = active && (!expiresMs || expiresMs > Date.now())
 
   try {
+    const plan = stillValid ? planForProduct(event?.product_id) : 'free'
     await admin.from('profiles').update({
-      plan: stillValid ? planForProduct(event?.product_id) : 'free',
-      entitled_until: stillValid && expiresMs ? new Date(expiresMs).toISOString() : null,
+      plan,
+      // 'lifetime' never expires, so it keeps a null window on purpose - the
+      // entitlement check reads the plan alone for that tier.
+      entitled_until: plan !== 'free' && plan !== 'lifetime' && expiresMs
+        ? new Date(expiresMs).toISOString()
+        : null,
     }).eq('id', uid)
   } catch (e) {
     return res.status(500).json({ error: e.message || 'Webhook handling failed.' })

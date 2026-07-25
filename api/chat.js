@@ -22,10 +22,15 @@
 import { GoogleGenAI } from '@google/genai'
 import { getStateContent } from './_corpus.js'
 import { PLAYBOOK, matchPlaybook } from './_playbook.js'
+import { clientIp, rateLimit } from './_ratelimit.js'
 
 const MAX_TURNS = 16
 const MAX_MSG_CHARS = 2000
 const MAX_OUTPUT_TOKENS = 1024
+// Per-IP brake. Generous for a person reading and thinking between questions;
+// tight enough that a script loop stops paying off. See _ratelimit.js for what
+// this does and does not actually guarantee.
+const RATE_LIMIT = { limit: 20, windowMs: 5 * 60 * 1000 }
 
 // Groq (free) - OpenAI-compatible. llama-3.3-70b-versatile: ~1,000 req/day,
 // 30 req/min on the free tier. Override GROQ_MODEL to llama-3.1-8b-instant for
@@ -234,6 +239,13 @@ export default async function handler(req, res) {
   const order = providerOrder()
   if (order.length === 0) {
     res.status(500).json({ error: 'Server is not configured yet (no model provider key set).' })
+    return
+  }
+
+  const gate = rateLimit(clientIp(req), RATE_LIMIT)
+  if (!gate.ok) {
+    res.setHeader('Retry-After', String(gate.retryAfter))
+    res.status(429).json({ error: 'That is a lot of questions at once. Please wait a minute and try again.' })
     return
   }
 

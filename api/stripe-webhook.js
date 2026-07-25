@@ -79,17 +79,29 @@ async function applySubscription(admin, sub, { userId, customerId }) {
   if (!uid) return // can't attribute — nothing safe to write
 
   const active = sub.status === 'active' || sub.status === 'trialing'
-  const priceId = sub.items?.data?.[0]?.price?.id
+  const item = sub.items?.data?.[0]
+  const priceId = item?.price?.id
   const plan = active ? planForPrice(priceId) : 'free'
-  const entitledUntil = active && sub.current_period_end
-    ? new Date(sub.current_period_end * 1000).toISOString()
+  // Stripe moved current_period_start/end OFF the subscription and ONTO each
+  // subscription item in the 2025 API versions. Read the item first and fall back
+  // to the legacy top-level field, so this works whichever version the account is
+  // pinned to. Getting this wrong writes entitled_until = null for a real payer,
+  // which the entitlement gate reads as "not subscribed".
+  const periodEnd = item?.current_period_end ?? sub.current_period_end
+  const entitledUntil = active && periodEnd
+    ? new Date(periodEnd * 1000).toISOString()
     : null
 
-  await admin.from('profiles').update({
+  const { data: written, error } = await admin.from('profiles').update({
     plan,
     entitled_until: entitledUntil,
     stripe_customer_id: (customerId || sub.customer) ?? undefined,
-  }).eq('id', uid)
+  }).eq('id', uid).select('id')
+  if (error) throw error
+  // An update that matched nothing is silent by default - someone paid and no row
+  // moved. Say so loudly in the function log rather than 500-looping Stripe, since
+  // the row only exists once the user has finished PIN setup.
+  if (!written?.length) console.error('RightsBook stripe-webhook: no profiles row for', uid)
 }
 
 async function userIdForCustomer(admin, customerId) {

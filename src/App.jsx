@@ -45,6 +45,18 @@ const REPORT_EMAIL = 'californiadepartmentoflove+rightsbook@gmail.com'
 const SOURCES_REVIEWED = '2026-07-13'
 const REVIEWED_STATES = new Set(['CA'])
 
+// Injected by vite.config.js `define` from package.json + build time.
+const APP_VERSION = __APP_VERSION__
+const APP_BUILD = __APP_BUILD__
+// Dates the app shows are formatted in the reader's language, never a bare ISO string.
+const DATE_LOCALE = { en: 'en-US', es: 'es-ES', tl: 'fil-PH' }
+const buildDate = (lang) => {
+  try {
+    return new Date(APP_BUILD).toLocaleDateString(DATE_LOCALE[lang] || 'en-US',
+      { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch { return APP_BUILD }
+}
+
 const STATE_OPTIONS = Object.entries(US_STATES).map(([value, label]) => ({ value, label }))
 const stateName = (code) => US_STATES[code] || code
 const stateCovered = (code) => !!STATES[code]
@@ -66,6 +78,9 @@ const C = {
   accent: '#2E7D74',
   accentSoft: '#E4EEEC',
   danger: '#C0452C',
+  dangerSoft: '#F7E4DF', // the "no" answer / blanket-rule flag tint
+  mapBase: '#EDEBE7',    // unselected CA county fill
+  mapLine: '#D3CFC8',    // unselected CA county stroke
   cloudOk: '#2E8B40', // brighter "sync is working" green - the portfolio-wide cloud cue (GuestBook/BlackBook)
 }
 
@@ -76,6 +91,16 @@ const IS_TOUCH = typeof window !== 'undefined' && !!window.matchMedia?.('(pointe
 const NAV_CLEARANCE = 'calc(env(safe-area-inset-bottom) + 78px)'
 
 const STARTER_KEYS = ['starter1', 'starter2', 'starter3', 'starter4', 'starter5']
+
+// Tallest the composer grows before it starts scrolling internally (~5 lines).
+const COMPOSER_MAX = 120
+
+// Off-screen but still read aloud. For status text that a sighted reader gets from
+// the answer simply appearing, and a screen-reader user would otherwise never hear.
+const SR_ONLY = {
+  position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+  overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+}
 
 const serif = "Georgia, 'Times New Roman', serif"
 
@@ -1336,10 +1361,17 @@ function PageTitle({ children }) {
 // Rights (right). History lives on the Ask page header, not here.
 function Nav({ tab, onAsk, onLibrary, onVault }) {
   const t = useT()
+  // Labels are longer in Spanish and Tagalog: "Magtanong / Vault / Karapatan" measured
+  // 319.5px inside a 320px screen, so the pill sat flush against both bezels with its
+  // shadow clipped. Trim the padding, let the pills shrink, and cap the bar so it can
+  // never reach the edge whatever the language.
   const pill = (label, active, onClick) => (
-    <button onClick={onClick} style={{
+    <button onClick={onClick} aria-current={active ? 'page' : undefined} style={{
       border: 'none', background: active ? C.accent : 'transparent', color: active ? '#fff' : C.sub,
-      borderRadius: 999, padding: '10px 20px', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+      borderRadius: 999, padding: '10px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+      // Shrink + ellipsis is the last resort only. The padding above is trimmed
+      // enough that the longest shipped labels stay whole down to a 320px screen.
+      minWidth: 0, flexShrink: 1, overflow: 'hidden', textOverflow: 'ellipsis',
     }}>{label}</button>
   )
   return (
@@ -1348,6 +1380,7 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
         style={{
           pointerEvents: 'auto',
           display: 'flex', alignItems: 'center', gap: 6, padding: '5px 10px',
+          maxWidth: 'calc(100vw - 24px)',
           background: 'rgba(255,255,255,0.86)',
           backdropFilter: 'blur(18px) saturate(1.4)',
           WebkitBackdropFilter: 'blur(18px) saturate(1.4)',
@@ -1415,7 +1448,28 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
   const lastMsgRef = useRef(null)
   const prevLenRef = useRef(0)
   const prevActiveRef = useRef(null)
+  const [justAnswered, setJustAnswered] = useState(false)
   const kbInset = useKeyboardInset()
+
+  // Grow the composer with the question. A rows={1} textarea keeps a one-line box
+  // no matter how much is typed, so a long question scrolls away under its own top
+  // edge - you can't read back what you wrote before sending it. Worse in Spanish
+  // and Tagalog, where even the PLACEHOLDER wraps to two lines and clips.
+  // Measure from a collapsed height, then cap at COMPOSER_MAX and hand the overflow
+  // to the textarea's own scroll. Re-runs when `compact` swaps the padding, since
+  // that changes the height the same text needs.
+  const taRef = useRef(null)
+  useEffect(() => {
+    const el = taRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    // scrollHeight excludes the border; box-sizing is border-box, so add it back
+    // or the box lands 2px short and shows a phantom scrollbar.
+    const border = el.offsetHeight - el.clientHeight
+    const full = el.scrollHeight + border
+    el.style.height = `${Math.min(full, COMPOSER_MAX)}px`
+    el.style.overflowY = full > COMPOSER_MAX ? 'auto' : 'hidden'
+  }, [input, compact])
 
   // Pull down on the conversation to file it away and start a fresh question
   // (same gesture as GuestBook's refresh; here "refresh" = new question).
@@ -1430,6 +1484,11 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
     prevActiveRef.current = activeId
     prevLenRef.current = messages.length
     const last = messages[messages.length - 1]
+
+    // Announce only an answer that just ARRIVED. Opening a saved conversation also
+    // ends on an assistant message, and saying "answer ready" for something written
+    // last week would be a lie told to the person least able to check it.
+    setJustAnswered(!switched && !!last && last.role === 'assistant' && messages.length === prevLen + 1)
 
     if (switched) {
       el.scrollTop = 0
@@ -1492,9 +1551,13 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
                 ))}
               </div>
             )}
-            <div style={{ minHeight: 26, padding: '2px 4px' }}>
+            {/* The one spoken channel for the Ask flow: "looking up", the error, and
+                - invisibly - the fact that an answer landed. Without this a screen
+                reader user gets total silence between sending and reading. */}
+            <div role="status" aria-live="polite" aria-atomic="true" style={{ minHeight: 26, padding: '2px 4px' }}>
               {busy && <span style={{ fontSize: 13, color: C.sub }}>{t('lookingUp')}</span>}
               {!busy && error && <span style={{ fontSize: 13, color: C.danger }}>{error}</span>}
+              {!busy && !error && justAnswered && <span style={SR_ONLY}>{t('ansReady')}</span>}
             </div>
           </div>
         </div>
@@ -1511,6 +1574,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
               collapses to its cols width. */}
           <div style={{ flex: 1 }}>
             <textarea
+              ref={taRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onFocus={() => setComposerFocus(true)}
@@ -1518,7 +1582,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input) } }}
               placeholder={t('composerPlaceholder')}
               rows={1}
-              style={{ ...inputStyle, resize: 'none', borderRadius: 14, padding: compact ? '7px 14px' : '12px 14px', lineHeight: 1.4, maxHeight: 120, transition: 'padding 0.15s ease' }}
+              style={{ ...inputStyle, resize: 'none', borderRadius: 14, padding: compact ? '7px 14px' : '12px 14px', lineHeight: 1.4, maxHeight: COMPOSER_MAX, transition: 'padding 0.15s ease' }}
             />
           </div>
           {!compact && (
@@ -1937,6 +2001,15 @@ const IcMap = ({ size = 24, style }) => (
     <line x1="8" y1="3" x2="8" y2="18" /><line x1="16" y1="6" x2="16" y2="21" />
   </SvgIcon>
 )
+// "Other states". Deliberately NOT IcMap, which already means "find the office that
+// serves your area" on two other cards - the same glyph for a different idea makes
+// both read as the same feature.
+const IcGlobe = ({ size = 24, style }) => (
+  <SvgIcon size={size} style={style}>
+    <circle cx="12" cy="12" r="9" /><path d="M3 12h18" />
+    <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
+  </SvgIcon>
+)
 const IcScale = ({ size = 24, style }) => (
   <SvgIcon size={size} style={style}>
     <path d="M12 3v18" /><path d="M7 21h10" /><path d="M4 7h16" />
@@ -2037,6 +2110,19 @@ function stateGroups(code, t) {
     if (map) (buckets[map[0]] ||= []).push(card)
     else extra.push(card)
   })
+  // Eight states (AR KS MS MT NE NM WV WY) have no `-rights` chunk in the corpus.
+  // Their "Your rights" section simply did not render, so the gap was invisible: the
+  // reader saw four topics instead of five and had no way to tell whether their state
+  // has no such law or we just never loaded it. Say which it is. Never imply the
+  // state lacks protections - the federal floor applies everywhere.
+  if (!buckets.rights?.length) {
+    buckets.rights = [{
+      id: `${code}-rights-missing`,
+      title: t('rtsRightsMissing', { name }),
+      text: t('rtsRightsMissingBody', { name }),
+      citation: null,
+    }]
+  }
   const out = []
   STATE_GROUPS_ORDER.forEach(([gk, Icon, labelKey]) => {
     if (buckets[gk]?.length) out.push({ icon: Icon, label: t(labelKey), cards: buckets[gk] })
@@ -2063,6 +2149,7 @@ function GroupedRights({ groups }) {
               <div key={c.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
                 <button
                   onClick={() => setOpen(isOpen ? null : c.id)}
+                  aria-expanded={isOpen}
                   style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: 'transparent', border: 'none', padding: '14px 14px', cursor: 'pointer', textAlign: 'left' }}
                 >
                   <span style={{ fontSize: 15, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>{c.title}</span>
@@ -2211,7 +2298,7 @@ function WhereToStartSheet({ code, onClose }) {
 const reviewedDate = (lang) => {
   try {
     return new Date(SOURCES_REVIEWED + 'T12:00:00').toLocaleDateString(
-      { en: 'en-US', es: 'es-ES', tl: 'fil-PH' }[lang] || 'en-US',
+      DATE_LOCALE[lang] || 'en-US',
       { year: 'numeric', month: 'long', day: 'numeric' }
     )
   } catch { return SOURCES_REVIEWED }
@@ -2284,14 +2371,27 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
         <VaultTile icon={<IcPhone size={22} />} label={t('rtTileHelp')} sub={t('rtTileHelpSub')} onClick={() => setView('help')} />
       </div>
 
-      {/* Other states spans full width below the primary cards - every state gets the federal floor. */}
-      <div style={{ marginTop: 12 }}>
-        <HubHero icon={IcMap} title={t('rtTileOthers')} sub={t('rtTileOthersSub')} onClick={() => setView('others')} />
-      </div>
+      {/* Other states is a full-width row, but a QUIETER one than the two HubHeroes
+          above: looking up a state you don't live in is a side errand, and at equal
+          weight it competed with "your state" and "federal" for the same attention. */}
+      <button
+        onClick={() => setView('others')}
+        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(43,42,40,0.04)', padding: '12px 14px', marginTop: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+      >
+        <span style={{ width: 34, height: 34, borderRadius: 10, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcGlobe size={18} /></span>
+        <span style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.ink, lineHeight: 1.2 }}>{t('rtTileOthers')}</span>
+          <span style={{ display: 'block', fontSize: 12.5, color: C.sub, marginTop: 2, lineHeight: 1.35 }}>{t('rtTileOthersSub')}</span>
+        </span>
+        <IcChevron dir="right" size={16} style={{ color: C.ink3, flexShrink: 0 }} />
+      </button>
 
-      {/* Freshness line for verified states only (see REVIEWED_STATES). */}
+      {/* Freshness line for verified states only (see REVIEWED_STATES). The extra
+          bottom margin lifts it clear of the nav's fade gradient: the page's bottom
+          padding left it sitting in the fade's soft band, washing out a line that is
+          a trust signal - it should read crisply or not be there at all. */}
       {REVIEWED_STATES.has(stateCode) && (
-        <div style={{ fontSize: 12, color: C.ink3, margin: '16px 2px 0', textAlign: 'center', lineHeight: 1.5 }}>
+        <div style={{ fontSize: 12, color: C.ink3, margin: '16px 2px 34px', textAlign: 'center', lineHeight: 1.5 }}>
           {t('srcReviewed', { name, date: reviewedDate(lang) })}
         </div>
       )}
@@ -2341,8 +2441,8 @@ function RegionalCenters() {
             const sel = n === county
             return (
               <path key={n} d={CA_MAP.paths[n]}
-                fill={on ? (sel ? C.accent : C.accentSoft) : '#EDEBE7'}
-                stroke={on ? C.accent : '#D3CFC8'} strokeWidth={sel ? 1.4 : 0.6} strokeLinejoin="round" />
+                fill={on ? (sel ? C.accent : C.accentSoft) : C.mapBase}
+                stroke={on ? C.accent : C.mapLine} strokeWidth={sel ? 1.4 : 0.6} strokeLinejoin="round" />
             )
           })}
         </svg>
@@ -2743,6 +2843,16 @@ const openLetter = (tplId, fields, t) => openHtmlDoc(buildLetterHtml(tplId, fiel
 
 // ─── VAULT DOCUMENTS & PHOTOS (E2E; file bytes in the private storage bucket) ──
 const MAX_DOC_BYTES = 25 * 1024 * 1024 // matches the bucket's file_size_limit
+
+// Types we're willing to hand to a blob URL, which renders on the app's OWN origin.
+// The file picker asks for images + PDF, but `accept` is a hint a determined user can
+// step around, and text/html or an SVG would then execute script beside the vault.
+// Everything else falls back to octet-stream, which downloads rather than renders.
+const VIEWABLE_MIME = new Set([
+  'application/pdf',
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+])
+const safeDocMime = (mime) => (VIEWABLE_MIME.has(String(mime || '').toLowerCase()) ? mime : 'application/octet-stream')
 const docSort = (list) => [...list].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
 
 // Shrink an image to a ~400px WebP thumbnail (media pipeline: the grid pulls
@@ -2804,6 +2914,12 @@ function useVaultDocs(cloud) {
       }
       const rec = { id, name: file.name || '', mime: file.type || '', size: file.size, at: todayISO(), isImage, hasThumb, createdAt: Date.now() }
       setDocs((prev) => docSort([rec, ...prev]))
+      // Write this row NOW rather than waiting on the 800ms debounce below. The
+      // bytes are already in the bucket; if the app closed inside that window the
+      // file became an orphan - paid-for storage with no row pointing at it and no
+      // way to ever see or delete it. Delta push makes the debounced write that
+      // follows a no-op, so this costs nothing extra.
+      cloud.pushItems('doc', [rec])
       return { ok: true, id, isImage }
     } catch { return { error: 'read' } }
     finally { setBusy(false) }
@@ -2943,7 +3059,10 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded, readOnly })
     setError('')
     const bytes = await cloud.downloadBytes(doc.id)
     if (!bytes) { setError(t('docOpenFailed')); return }
-    const url = URL.createObjectURL(new Blob([bytes], { type: doc.mime || 'application/octet-stream' }))
+    // Serve the blob under a type we chose, not the one the file claimed. A blob URL
+    // opens on THIS origin, so an HTML file slipped past the picker's accept filter
+    // would run script next to the vault. Anything not on the list downloads instead.
+    const url = URL.createObjectURL(new Blob([bytes], { type: safeDocMime(doc.mime) }))
     if (!window.open(url, '_blank')) { URL.revokeObjectURL(url); setError(t('docOpenFailed')); return }
     setTimeout(() => URL.revokeObjectURL(url), 60000)
   }
@@ -3189,7 +3308,7 @@ function RmcSheet({ onClose, onSaveIncident }) {
       {['yes', 'no', 'unsure'].map((v) => {
         const active = answers[id] === v
         const col = v === 'yes' ? C.accent : v === 'no' ? C.danger : C.sub
-        const bg = !active ? C.card : v === 'yes' ? C.accentSoft : v === 'no' ? '#F7E4DF' : C.bg
+        const bg = !active ? C.card : v === 'yes' ? C.accentSoft : v === 'no' ? C.dangerSoft : C.bg
         return (
           <button
             key={v} onClick={() => setAnswers((a) => ({ ...a, [id]: v }))} aria-pressed={active}
@@ -3219,7 +3338,7 @@ function RmcSheet({ onClose, onSaveIncident }) {
     return (
       <Modal onClose={onClose} title={t('rmcCard')}>
         {blanket && (
-          <div style={{ ...resultCard('#F7E4DF', `${C.danger}55`) }}>
+          <div style={{ ...resultCard(C.dangerSoft, `${C.danger}55`) }}>
             <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.5 }}>{t('rmcBlanket')}</div>
             <div style={{ fontSize: 11, color: C.ink3, marginTop: 6 }}>42 CFR 441.301(c)(4)(vi)(F)</div>
           </div>
@@ -3305,7 +3424,7 @@ function HomeCheckSheet({ onClose, onSaveIncident }) {
       {['yes', 'no', 'unsure'].map((v) => {
         const active = answers[id] === v
         const col = v === 'yes' ? C.accent : v === 'no' ? C.danger : C.sub
-        const bg = !active ? C.card : v === 'yes' ? C.accentSoft : v === 'no' ? '#F7E4DF' : C.bg
+        const bg = !active ? C.card : v === 'yes' ? C.accentSoft : v === 'no' ? C.dangerSoft : C.bg
         return (
           <button
             key={v} onClick={() => setAnswers((a) => ({ ...a, [id]: v }))} aria-pressed={active}
@@ -3530,10 +3649,14 @@ function Paywall({ cloud, onNativePaid }) {
       return
     }
     try {
+      // The server reads the buyer's identity from this token, not from the body -
+      // so there is no userId/email to send, and none to forge.
+      const token = await cloud.getAccessToken()
+      if (!token) { setErr(t('payError')); setBusy(''); return }
       const res = await fetch(`${API_ORIGIN}/api/checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: cloud.userId, email: cloud.email, plan }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ plan }),
       })
       const data = await res.json().catch(() => ({}))
       if (res.status === 503) { setErr(t('payComingSoon')); setBusy(''); return }
@@ -3635,6 +3758,29 @@ function Paywall({ cloud, onNativePaid }) {
   )
 }
 
+// ⚠️ MODULE SCOPE, NOT inside VaultPage. A component declared during render gets a
+// NEW identity every render, so React unmounts and rebuilds its whole subtree: the
+// scroll position resets and any field inside loses its text AND its focus. That bit
+// hard here, because `kbInset` changes the moment the keyboard opens, so typing an
+// email / code / PIN re-rendered VaultPage and wiped the field mid-keystroke. Keep
+// these two out here and pass what they need as props.
+function VaultScrollPage({ kbInset, children }) {
+  return (
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `10px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch', marginBottom: kbInset, transition: 'margin-bottom 0.2s ease' }}>
+      {children}
+    </div>
+  )
+}
+// In-sheet back link (form -> list), mirroring the Rights OtherStatesSheet. The
+// sheet itself is dismissed by swipe-down / tap-away; this only steps back a level.
+function SheetBack({ label, onBack }) {
+  return (
+    <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: C.accent, cursor: 'pointer', padding: '2px 2px 12px', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
+      <IcChevron dir="left" size={15} /> {label}
+    </button>
+  )
+}
+
 // The Vault is now its own PAGE/tab (like Rights), not a stack of sheets. A hub
 // of tiles; tapping one drills into that tool IN-PAGE with a labeled back
 // control. Add/edit forms are in-page too - so their fields ride the app-wide
@@ -3669,20 +3815,8 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
     onDeleteIncident(inc.id)
   }
 
-  const Page = ({ children }) => (
-    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', padding: `10px 16px ${NAV_CLEARANCE}`, WebkitOverflowScrolling: 'touch', marginBottom: kbInset, transition: 'margin-bottom 0.2s ease' }}>
-      {children}
-    </div>
-  )
   // Close whatever drill-in sheet is open and land back on the hub.
   const closeSheet = () => { setView('hub'); setEditing(null); setEditingDl(null); setPacketError('') }
-  // In-sheet back link (form -> list), mirroring the Rights OtherStatesSheet. The
-  // sheet itself is dismissed by swipe-down / tap-away; this only steps back a level.
-  const SheetBack = ({ label, onBack }) => (
-    <button onClick={onBack} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: 'none', border: 'none', color: C.accent, cursor: 'pointer', padding: '2px 2px 12px', fontSize: 14, fontWeight: 600, fontFamily: 'inherit' }}>
-      <IcChevron dir="left" size={15} /> {label}
-    </button>
-  )
   const emptyCard = (text) => (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>{text}</div>
   )
@@ -3764,7 +3898,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
   // lands straight on the PIN. Public help lives on the Rights tab.
   if (!ready) {
     return (
-      <Page>
+      <VaultScrollPage kbInset={kbInset}>
         <PageTitle>{t('navVault')}</PageTitle>
         <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('vaultHubSub')}</div>
         <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: '16px 14px', margin: '0 0 18px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
@@ -3773,7 +3907,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
           )}
           <AuthFlow cloud={cloud} />
         </div>
-      </Page>
+      </VaultScrollPage>
     )
   }
 
@@ -3783,20 +3917,20 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
   // viewable/exportable. `entitled` is web (Stripe/Supabase) OR native (RC).
   if (!entitled && !hasVaultData) {
     return (
-      <Page>
+      <VaultScrollPage kbInset={kbInset}>
         <PageTitle>{t('navVault')}</PageTitle>
         <Paywall cloud={cloud} onNativePaid={onNativePaid} />
-      </Page>
+      </VaultScrollPage>
     )
   }
 
   // The hub is always the page underneath; each tile opens a swipe-to-close sheet
   // over it (matching the Rights hub), not an in-page back-button view. The sheets
-  // are siblings of <Page> (not children) so they keep the stable top-level Modal
+  // are siblings of the page scroller (not children) so they keep the stable top-level Modal
   // type and never remount when the hub re-renders (e.g. a photo upload lands).
   return (
     <>
-      <Page>
+      <VaultScrollPage kbInset={kbInset}>
         <PageTitle>{t('navVault')}</PageTitle>
         <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{readOnly ? t('vaultLapsedSub') : t('vaultHubSub')}</div>
         {/* Lapsed: records stay viewable/exportable; a calm banner offers to resume. */}
@@ -3814,7 +3948,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
           <VaultTile icon={<IcImage size={22} />} label={t('docsTitle')} sub={countText(vaultDocs.docs.length)} onClick={() => setView('documents')} />
           <VaultTile icon={<IcFileText size={22} />} label={t('packet')} sub={t('tilePacketSub')} onClick={() => setView('packet')} />
         </div>
-      </Page>
+      </VaultScrollPage>
 
       {/* Read-only user chose Resubscribe → the paywall over the hub. */}
       {showPaywall && (
@@ -3938,6 +4072,12 @@ function SettingsSheet({ onClose, count, onDeleteAll, lang, onLangChange }) {
           <br /><br />
           {t('aboutBody2')}
         </div>
+        {/* Which code is actually running. A service worker on the web and a synced
+            bundle on native can both serve yesterday's build, so "did my update
+            land?" needs an answer you can read rather than infer. */}
+        <div style={{ fontSize: 11.5, color: C.ink3, marginTop: 12, lineHeight: 1.5 }}>
+          {t('versionLine', { v: APP_VERSION, d: buildDate(lang) })}
+        </div>
       </SheetSection>
     </Modal>
   )
@@ -4000,7 +4140,7 @@ const cloudBtn = (kind = 'primary') => ({
 // (feedback-popup-text-no-reflow).
 function CloudNote({ error }) {
   return (
-    <div style={{ minHeight: 18, margin: '10px 2px 0', fontSize: 13, lineHeight: 1.35, color: C.danger, opacity: error ? 1 : 0, transition: 'opacity 0.15s' }}>
+    <div role="alert" aria-live="assertive" aria-atomic="true" style={{ minHeight: 18, margin: '10px 2px 0', fontSize: 13, lineHeight: 1.35, color: C.danger, opacity: error ? 1 : 0, transition: 'opacity 0.15s' }}>
       {error || ' '}
     </div>
   )

@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Optional chaining so this module can also be imported by a plain `node` script
+// (import.meta.env only exists under Vite). Vite still statically replaces these
+// at build time; outside it they read undefined and the client stays null.
+const url = import.meta.env?.VITE_SUPABASE_URL;
+const key = import.meta.env?.VITE_SUPABASE_ANON_KEY;
 
 // Only initialize if REAL credentials are present — app works fully offline without them.
 // Placeholder values (the defaults committed to .env) count as "not configured" so the
