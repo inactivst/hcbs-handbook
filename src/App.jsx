@@ -5,6 +5,7 @@ import { useCloud, mergeConversations } from './cloud.js'
 import { LANG_OPTIONS, LangContext, getStoredLang, storeLang, useT, tr } from './i18n.js'
 import { CENTERS, COUNTY_TO_RC, LA_CENTERS, COUNTIES, siblingCounties, CA_MAP, DDS_LOOKUP_URL } from './regionalCenters.js'
 import { STATE_GUIDE, hasStateGuide } from './stateGuide.js'
+import { compareStates, COMPARE_TOPICS } from './compareStates.js'
 import { FEDERAL_TERMS, getStateTerms } from './glossary.js'
 import { IS_NATIVE, rcAvailable, rcLoadPricing, rcCheckEntitlement, rcPurchase, rcRestore, withTimeout } from './purchases.js'
 
@@ -2227,10 +2228,107 @@ function CodesSheet({ code, onClose }) {
     </Modal>
   )
 }
+// Search every state pack at once and rank by how SPECIFIC each state's language is,
+// then quote it with its citation. The deterministic sibling of the AI compare that
+// lives under a chat answer: that one explains a difference between two states, this
+// one finds which states have anything worth reading in the first place. Nothing is
+// sent anywhere and no model is involved - the corpus is already on the device, so
+// this works offline and the words on screen are the source's own.
+function CompareStates({ currentCode, onOpen }) {
+  const t = useT()
+  const [topic, setTopic] = useState('all')
+  const [q, setQ] = useState('')
+  const query = q.trim()
+  const idle = !query && topic === 'all'
+  const res = idle ? null : compareStates(query, { topic, exclude: currentCode })
+
+  const chip = (label, tone = 'accent') => (
+    <span key={label} style={{
+      fontSize: 11, fontWeight: 600, borderRadius: 999, padding: '2px 8px', whiteSpace: 'nowrap',
+      color: tone === 'accent' ? C.accent : C.sub,
+      background: tone === 'accent' ? C.accentSoft : C.bg,
+      border: `1px solid ${C.line}`,
+    }}>{label}</span>
+  )
+  const SIGNAL_KEY = { deadline: 'csWhyDeadline', obligation: 'csWhyObligation', statute: 'csWhyStatute', contact: 'csWhyContact' }
+
+  return (
+    <>
+      <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('csIntro')}</div>
+      <Select
+        value={topic}
+        onChange={setTopic}
+        options={COMPARE_TOPICS.map((o) => ({ value: o.id, label: t(`csTopic${o.id.charAt(0).toUpperCase()}${o.id.slice(1)}`) }))}
+        ariaLabel={t('csTabCompare')}
+      />
+      <input
+        value={q} onChange={(e) => setQ(e.target.value)}
+        placeholder={t('csSearchPh')} aria-label={t('csSearchPh')}
+        style={{ ...inputStyle, marginTop: 10, marginBottom: 14 }}
+      />
+
+      {idle && <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '18px 2px' }}>{t('csStart')}</div>}
+
+      {res && res.matched === 0 && (
+        // The honest empty state. Saying "no state addresses this" would be a claim we
+        // cannot support; what we actually know is that our corpus has nothing.
+        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.55 }}>{t('csNothing')}</div>
+          {res.unmatchedTerms.length > 0 && (
+            <div style={{ fontSize: 12.5, color: C.sub, marginTop: 8, lineHeight: 1.5 }}>
+              {t('csNothingTerms', { terms: res.unmatchedTerms.join(', ') })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {res && res.matched > 0 && (
+        <>
+          <div style={{ fontSize: 12.5, color: C.sub, lineHeight: 1.5, margin: '0 2px 10px' }}>
+            {t('csSummary', { matched: res.matched, searched: res.searched, shown: res.hits.length })}
+          </div>
+          {res.hits.map((h) => (
+            <button
+              key={h.code} onClick={() => onOpen(h.code)}
+              style={{ width: '100%', textAlign: 'left', display: 'block', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 8, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{h.name}</span>
+                {/* Why this state ranked here, in checkable terms. The reader can see
+                    the deadline or the citation in the quote below and judge for
+                    themselves rather than trusting a score. */}
+                {h.signals.map((sig) => chip(t(SIGNAL_KEY[sig])))}
+              </span>
+              <span style={{ display: 'block', fontSize: 13.5, color: C.ink, lineHeight: 1.6 }}>{h.excerpt}</span>
+              {h.citation && (
+                <span style={{ display: 'block', fontSize: 11.5, color: C.ink3, marginTop: 8, paddingTop: 8, borderTop: `1px solid ${C.line}`, lineHeight: 1.45 }}>
+                  <span style={{ color: C.sub, fontWeight: 700 }}>{t('rtSource')}</span> {h.citation}
+                </span>
+              )}
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 600, color: C.accent, marginTop: 8 }}>
+                {t('csReadFull', { name: h.name })}<IcChevron dir="right" size={13} />
+              </span>
+            </button>
+          ))}
+          {res.silent > 0 && (
+            // The number that answers "do I still have 49 to check?". Never drop it:
+            // a list of 8 with no denominator implies the other 43 were checked and
+            // rejected, when in fact they simply have nothing loaded.
+            <div style={{ fontSize: 12.5, color: C.ink3, lineHeight: 1.5, margin: '10px 2px 0' }}>
+              {t('csSilent', { n: res.silent })}
+            </div>
+          )}
+        </>
+      )}
+    </>
+  )
+}
+
 function OtherStatesSheet({ currentCode, onClose }) {
   const t = useT()
   const [q, setQ] = useState('')
   const [sel, setSel] = useState(null)
+  const [mode, setMode] = useState('browse')
   if (sel) {
     return (
       <Modal onClose={onClose} title={t('rtStateTitle', { name: stateName(sel) })}>
@@ -2244,8 +2342,27 @@ function OtherStatesSheet({ currentCode, onClose }) {
   const others = STATE_OPTIONS.filter((o) => o.value !== currentCode)
   const needle = q.trim().toLowerCase()
   const list = needle ? others.filter((o) => o.label.toLowerCase().includes(needle)) : others
+  const tab = (id, label) => {
+    const on = mode === id
+    return (
+      <button
+        key={id} onClick={() => setMode(id)} aria-pressed={on}
+        style={{ flex: 1, padding: '9px 8px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accentSoft : C.card, color: on ? C.accent : C.sub }}
+      >{label}</button>
+    )
+  }
   return (
     <Modal onClose={onClose} title={t('rtOthersTitle')}>
+      {/* Browse = "show me Ohio". Compare = "which states say anything useful about
+          this?". Both live here because both start from the same thought, and the
+          compare results hand off into the same per-state guide. */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+        {tab('browse', t('csTabBrowse'))}
+        {tab('compare', t('csTabCompare'))}
+      </div>
+      {mode === 'compare' ? <CompareStates currentCode={currentCode} onOpen={setSel} /> : (
+      <>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('rtOthersIntro')}</div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('rtSearchStates')} aria-label={t('rtSearchStates')} style={{ ...inputStyle, marginBottom: 12 }} />
       {list.map((o) => (
@@ -2257,6 +2374,8 @@ function OtherStatesSheet({ currentCode, onClose }) {
           </span>
         </button>
       ))}
+      </>
+      )}
     </Modal>
   )
 }

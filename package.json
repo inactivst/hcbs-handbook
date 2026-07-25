@@ -6,10 +6,11 @@
   "scripts": {
     "dev": "vite",
     "lint": "eslint src api",
-    "build": "vite build",
+    "check:compare": "node scripts/check-compare.mjs",
+    "build": "node scripts/check-compare.mjs && vite build",
     "preview": "vite preview",
-    "build:ios": "VITE_PAYMENT_PLATFORM=ios vite build",
-    "ios": "VITE_PAYMENT_PLATFORM=ios vite build && npx cap sync ios"
+    "build:ios": "node scripts/check-compare.mjs && VITE_PAYMENT_PLATFORM=ios vite build",
+    "ios": "node scripts/check-compare.mjs && VITE_PAYMENT_PLATFORM=ios vite build && npx cap sync ios"
   },
   "dependencies": {
     "@capacitor/cli": "^8.4.2",
