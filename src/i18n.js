@@ -243,6 +243,11 @@ const STRINGS = {
     paySaveChip: 'Save 44%',
     payStarting: 'Starting…',
     payFinePrint: 'Cancel anytime. Renews until cancelled. Secure payment through Stripe.',
+    // Native fine print never mentions Stripe — on iOS the charge is an Apple IAP,
+    // and 3.1.2 wants the renewal terms spelled out beside the Terms/Privacy links.
+    payFinePrintNative: 'Payment is charged to your Apple ID at confirmation. Your subscription renews automatically unless cancelled at least 24 hours before the period ends; manage or cancel anytime in your App Store account settings.',
+    payTerms: 'Terms of Use',
+    payPrivacy: 'Privacy Policy',
     payComingSoon: "Subscriptions aren't available quite yet. Please check back soon.",
     payError: 'Something went wrong starting checkout. Please try again.',
     // Native (App Store / RevenueCat) paywall — prices quoted from the store.
@@ -723,6 +728,9 @@ const STRINGS = {
     paySaveChip: 'Ahorra 44%',
     payStarting: 'Iniciando…',
     payFinePrint: 'Cancela cuando quieras. Se renueva hasta que canceles. Pago seguro con Stripe.',
+    payFinePrintNative: 'El cargo se hace a tu Apple ID al confirmar la compra. La suscripción se renueva automáticamente salvo que la canceles al menos 24 horas antes de que termine el periodo; puedes gestionarla o cancelarla cuando quieras en los ajustes de tu cuenta de App Store.',
+    payTerms: 'Términos de uso',
+    payPrivacy: 'Política de privacidad',
     payComingSoon: 'Las suscripciones aún no están disponibles. Vuelve pronto.',
     payError: 'Algo salió mal al iniciar el pago. Inténtalo de nuevo.',
     // Paywall nativo (App Store / RevenueCat) — precios tomados de la tienda.
@@ -1203,6 +1211,9 @@ const STRINGS = {
     paySaveChip: 'Makatipid 44%',
     payStarting: 'Sinisimulan…',
     payFinePrint: 'Puwedeng kanselahin anumang oras. Nagre-renew hanggang kanselahin. Secure na bayad sa pamamagitan ng Stripe.',
+    payFinePrintNative: 'Sisingilin ang iyong Apple ID kapag kinumpirma ang pagbili. Awtomatikong nagre-renew ang subscription maliban kung kanselahin mo ito nang hindi bababa sa 24 oras bago matapos ang panahon; puwede mong pamahalaan o kanselahin ito anumang oras sa mga setting ng iyong App Store account.',
+    payTerms: 'Mga Tuntunin ng Paggamit',
+    payPrivacy: 'Patakaran sa Privacy',
     payComingSoon: 'Hindi pa available ang mga subscription. Bibalik ka lang mamaya.',
     payError: 'May nangyaring mali sa pagsisimula ng bayad. Subukan ulit.',
     // Native (App Store / RevenueCat) paywall — presyo mula mismo sa store.

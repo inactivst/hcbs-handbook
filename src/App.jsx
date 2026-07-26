@@ -12,6 +12,13 @@ import { IS_NATIVE, rcAvailable, rcLoadPricing, rcCheckEntitlement, rcPurchase, 
 // Native shells must call the API at an absolute origin; web uses relative.
 const API_ORIGIN = import.meta.env.VITE_API_ORIGIN || ''
 
+// Legal links shown on the paywall. Both must be ABSOLUTE: inside the native
+// shell a relative /privacy.html resolves against the bundled app, where the
+// page isn't served. Terms of Use is Apple's standard EULA, which is what the
+// App Store listing points at too (Guideline 3.1.2).
+const PRIVACY_URL = 'https://rightsbook.thebook.ltd/privacy.html'
+const APPLE_EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
+
 // History lives ONLY in the browser's localStorage on this device - never sent
 // to a server, never shared. Keeps the privacy posture: the app stores nothing
 // server-side. Capped so storage can't grow without bound (code-for-scale).
@@ -3734,6 +3741,8 @@ function VaultTile({ icon, label, sub, onClick }) {
 //            never hardcoded — a literal is wrong in most storefronts and lies
 //            about per-Apple-ID trial eligibility ([[paywall-quote-the-store]]).
 // The native branch is inert on web (IS_NATIVE false), so the web path is unchanged.
+const payLegalLink = { fontSize: 12, fontWeight: 600, color: C.sub, textDecoration: 'underline' }
+
 function Paywall({ cloud, onNativePaid }) {
   const t = useT()
   const nativeIap = IS_NATIVE && rcAvailable()
@@ -3868,7 +3877,17 @@ function Paywall({ cloud, onNativePaid }) {
         </button>
       )}
 
-      <div style={{ fontSize: 12, color: C.ink3, lineHeight: 1.5, margin: '14px 2px 0', textAlign: 'center' }}>{t('payFinePrint')}</div>
+      {/* Fine print + legal links. Guideline 3.1.2 wants the renewal terms and a
+          functional Terms of Use link on the subscription screen itself, and the
+          native charge is an Apple IAP — never Stripe — so the copy branches. */}
+      <div style={{ fontSize: 12, color: C.ink3, lineHeight: 1.5, margin: '14px 2px 0', textAlign: 'center' }}>
+        {nativeIap ? t('payFinePrintNative') : t('payFinePrint')}
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 8 }}>
+        <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer" style={payLegalLink}>{t('payPrivacy')}</a>
+        <span style={{ fontSize: 12, color: C.line }}>·</span>
+        <a href={APPLE_EULA_URL} target="_blank" rel="noopener noreferrer" style={payLegalLink}>{t('payTerms')}</a>
+      </div>
 
       <button onClick={() => cloud.signOut()} style={{ ...cloudBtn('secondary'), marginTop: 16, color: C.sub }}>
         {t('signOut')}
