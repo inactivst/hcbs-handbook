@@ -1004,8 +1004,49 @@ function usePullToRefresh(onRefresh, { disabled = false, threshold = 64 } = {}) 
   return { contentRef, contentStyle, indicator }
 }
 
+// ─── ERROR BOUNDARY ───────────────────────────────────────────────────────────
+// Without this, ANY uncaught render/effect throw unmounts the whole tree: a white
+// screen with no message, which on a phone reads as "the app keeps crashing" and
+// gives us nothing to diagnose from. This card shows the actual error — a user's
+// screenshot of it IS the bug report — and offers a manual reload. Deliberately no
+// auto-reload: if the throw happens again at mount, auto-reload would just be the
+// same crash loop with extra steps. Class component because React only exposes
+// error boundaries through the class API. Ported from GuestBook ff8b061.
+class AppErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null } }
+  static getDerivedStateFromError(error) { return { error } }
+  render() {
+    if (!this.state.error) return this.props.children
+    const msg = String(this.state.error?.message || this.state.error || 'Unknown error')
+    return (
+      <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <div style={{ maxWidth: 420, width: '100%', background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 20, textAlign: 'center' }}>
+          <div style={{ fontFamily: serif, fontSize: 22, fontWeight: 700, color: C.ink, marginBottom: 8 }}>Something went wrong</div>
+          <div style={{ fontSize: 15, color: C.sub, lineHeight: 1.5, marginBottom: 14 }}>
+            The app hit an error it couldn't recover from. Your data is safe on this device.
+            A screenshot of this screen is the fastest way to get it fixed.
+          </div>
+          <div style={{ fontSize: 12, color: C.ink3, background: C.bg, border: `1px solid ${C.line}`, borderRadius: 10, padding: 12, marginBottom: 14, wordBreak: 'break-word', textAlign: 'left', fontFamily: 'ui-monospace, Menlo, monospace' }}>
+            {msg}
+          </div>
+          <button onClick={() => window.location.reload()} style={{ width: '100%', padding: '12px 16px', borderRadius: 12, cursor: 'pointer', fontSize: 16, fontWeight: 600, border: 'none', background: C.accent, color: '#fff' }}>Reload</button>
+        </div>
+      </div>
+    )
+  }
+}
+
 // ─── APP ──────────────────────────────────────────────────────────────────────
+// The boundary wraps the whole app so a throw anywhere lands on the error card.
 export default function App() {
+  return (
+    <AppErrorBoundary>
+      <AppInner />
+    </AppErrorBoundary>
+  )
+}
+
+function AppInner() {
   const [tab, setTab] = useState('chat')
   const [conversations, setConversations] = useState(loadConversations)
   const [activeId, setActiveId] = useState(null)
