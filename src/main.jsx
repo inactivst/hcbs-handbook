@@ -33,29 +33,65 @@ if (IS_NATIVE) {
   // autoUpdate installs a new worker, but an app that is ALREADY OPEN (especially an
   // iOS home-screen PWA, which only checks on cold launch) keeps serving the cached
   // old code until it is relaunched. So: check for an update whenever the app comes
-  // back to the foreground, plus a slow backstop, and reload once when a genuinely
-  // NEW worker takes control. Chat history is written to localStorage on change and
-  // vault records live in the cloud, so the reload never costs anyone data.
+  // back to the foreground, plus a slow backstop, and install the new worker quietly.
+  // The RELOAD that swaps the running code is a separate decision.
+  //
+  // ⚠️ THE APP MUST NEVER RELOAD ITSELF WHERE THE USER CAN SEE IT, AND MUST NEVER ASK.
+  // This used to reload the instant a new worker took control, whenever that was. Even
+  // with history in localStorage, a page that blanks and restarts mid-conversation
+  // reads as a crash - and this app's user is often part-way through a question about
+  // their own rights, which is the worst possible moment to look unreliable. GuestBook
+  // hit the same code path on 2026-07-27 and it was reported as the app glitching out.
+  // Prompting instead was tried and rejected: an "update ready, tap to refresh" pill is
+  // the same interruption with homework attached.
+  //
+  // So the only reload left is while the app is HIDDEN - invisible by definition.
+  // `reloadIfStillHidden` re-checks visibility at fire time, which is what makes it
+  // safe on iOS: iOS suspends JS timers almost immediately once a webview backgrounds,
+  // so a timer armed on hide typically fires LATE, on resume. Bailing there is the
+  // point - the update then lands on the next genuine cold start instead.
+  //
+  // (The Book and GuestBook additionally land a pending update on a pull-to-refresh,
+  // the user's own "get me the current state" gesture. This app has no such gesture to
+  // hang it on; if one is ever added, wire it up the same way - see their appUpdate.js.)
+  let hideTimer = 0
+  const reloadIfStillHidden = () => {
+    if (document.visibilityState !== 'hidden') return   // resumed first - wait for a cold start
+    window.location.reload()
+  }
+  const armHidden = () => {
+    clearTimeout(hideTimer)
+    // Grace period so anything debounced settles before the page goes away.
+    if (document.visibilityState === 'hidden') hideTimer = setTimeout(reloadIfStillHidden, 2000)
+  }
+  const deferReload = () => {
+    document.addEventListener('visibilitychange', armHidden)
+    armHidden()   // no-op unless the update landed while already hidden
+  }
   registerSW({
     immediate: true,
+    // Supplying onNeedReload is what suppresses vite-plugin-pwa's own unconditional
+    // window.location.reload() in its `activated` handler (see node_modules/
+    // vite-plugin-pwa/dist/client/build/register.js) - it is the only thing standing
+    // between a fresh deploy and a reload in the user's face. A plain controllerchange
+    // listener could not do it: the plugin's reload fires first.
+    onNeedReload: deferReload,
     onRegisteredSW(_swUrl, r) {
       if (!r) return
       const check = () => { r.update().catch(() => {}) }
-      setInterval(check, 60 * 1000)
+      // A 60s poll bought nothing but a near-certain mid-session takeover.
+      setInterval(check, 30 * 60 * 1000)
       document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check() })
       window.addEventListener('focus', check)
     },
   })
   if ('serviceWorker' in navigator) {
-    // Reload only on a REAL update - a controller already existed. Reloading on the
-    // first install's initial claim would bounce every brand-new visitor, and the
-    // `reloaded` latch stops any chance of a loop.
+    // Backstop for a worker that takes control without going through the plugin's
+    // `activated` path. Never on the first install's initial claim, which would bounce
+    // every brand-new visitor.
     const hadController = !!navigator.serviceWorker.controller
-    let reloaded = false
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!hadController || reloaded) return
-      reloaded = true
-      window.location.reload()
+      if (hadController) deferReload()
     })
   }
 }
