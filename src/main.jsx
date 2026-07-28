@@ -45,29 +45,24 @@ if (IS_NATIVE) {
   // Prompting instead was tried and rejected: an "update ready, tap to refresh" pill is
   // the same interruption with homework attached.
   //
-  // So the only reload left is while the app is HIDDEN - invisible by definition.
-  // `reloadIfStillHidden` re-checks visibility at fire time, which is what makes it
-  // safe on iOS: iOS suspends JS timers almost immediately once a webview backgrounds,
-  // so a timer armed on hide typically fires LATE, on resume. Bailing there is the
-  // point - the update then lands on the next genuine cold start instead.
+  // So there is NO self-reload at all. A new worker installs quietly and the running
+  // page keeps serving the code it booted with until the next cold start.
+  //
+  // ⚠️ A "RELOAD WHILE HIDDEN" IS NOT INVISIBLE, AND MUST NOT COME BACK. That was this
+  // block until 7/28 - arm a 2s timer on `visibilitychange`, re-check visibility at fire
+  // time, reload only if still hidden. The reasoning was that "hidden" means nobody is
+  // looking, but hidden only means nobody is looking RIGHT NOW. A tab-away shorter than
+  // iOS's JS suspend window fires the timer on time, the reload starts, iOS freezes the
+  // webview partway through the new document - and the user comes back to a blank splash
+  // and a cold restart, which is the very thing above. The visibility re-check cannot
+  // help: at fire time the page genuinely IS hidden. GuestBook shipped this guard and
+  // Kyle still hit the splash the next day; it came out of all three apps.
   //
   // (The Book and GuestBook additionally land a pending update on a pull-to-refresh,
-  // the user's own "get me the current state" gesture. This app has no such gesture to
-  // hang it on; if one is ever added, wire it up the same way - see their appUpdate.js.)
-  let hideTimer = 0
-  const reloadIfStillHidden = () => {
-    if (document.visibilityState !== 'hidden') return   // resumed first - wait for a cold start
-    window.location.reload()
-  }
-  const armHidden = () => {
-    clearTimeout(hideTimer)
-    // Grace period so anything debounced settles before the page goes away.
-    if (document.visibilityState === 'hidden') hideTimer = setTimeout(reloadIfStillHidden, 2000)
-  }
-  const deferReload = () => {
-    document.addEventListener('visibilitychange', armHidden)
-    armHidden()   // no-op unless the update landed while already hidden
-  }
+  // the user's own "get me the current state" gesture - the one reload a user waits for,
+  // because they asked for it. This app has no such gesture to hang it on; if one is
+  // ever added, wire it up the same way - see their appUpdate.js.)
+  const deferReload = () => {}   // update installed; nothing visible happens until a cold start
   registerSW({
     immediate: true,
     // Supplying onNeedReload is what suppresses vite-plugin-pwa's own unconditional
