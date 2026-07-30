@@ -78,7 +78,20 @@
           scroll-behavior: auto !important;
         }
       }
-    </style>
+          /* Keyboard focus, everywhere. There was no rule for this, so every button, tab,
+         card row and swipe row in the app was invisible to a keyboard — you could tab
+         through the whole thing and never see where you were.
+         :focus-visible (not :focus) is the load-bearing part — the browser only matches
+         it for keyboard/AT focus, never for touch or mouse, so nothing changes on a
+         phone and a tapped button doesn't keep a ring after the tap. `border-radius:
+         inherit` makes the ring follow the element's own radius instead of drawing a
+         rectangle around a pill. Some buttons set outline:none inline, hence !important. */
+      :focus-visible {
+        outline: 2px solid #2e7d74 !important;
+        outline-offset: 2px;
+        border-radius: inherit;
+      }
+</style>
   </head>
   <body>
     <div id="root"></div>
