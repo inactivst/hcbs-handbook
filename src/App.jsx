@@ -3869,7 +3869,7 @@ const payLegalLink = { fontSize: 12, fontWeight: 600, color: C.sub, textDecorati
 function Paywall({ cloud, onNativePaid }) {
   const t = useT()
   const nativeIap = IS_NATIVE && rcAvailable()
-  const [busy, setBusy] = useState('')       // '' | 'monthly' | 'annual' | 'restore'
+  const [busy, setBusy] = useState('')       // '' | 'monthly' | 'annual' | 'lifetime' | 'restore'
   const [err, setErr] = useState('')
   // Native only: the store's real prices/trial. null until loaded or if unreadable
   // (then we quote no number, per quote-the-store).
@@ -3951,6 +3951,13 @@ function Paywall({ cloud, onNativePaid }) {
   const lifetimeLabel = pricing?.lifetime
     ? t('payLifetimePriced', { price: pricing.lifetime.priceString })
     : t('payLifetimeGeneric')
+  // Only lead with lifetime when the store actually offers it. Optimistic while
+  // pricing is still loading (the offering is configured with all three, so this
+  // is the normal case and avoids a visible reshuffle); if the store comes back
+  // WITHOUT a lifetime package, fall back to annual-first rather than leaving a
+  // dead primary button — pkgFor('lifetime') would return null and the purchase
+  // could never start.
+  const leadLifetime = nativeIap && (pricing === null || !!pricing.lifetime)
 
   return (
     <div>
@@ -3969,23 +3976,37 @@ function Paywall({ cloud, onNativePaid }) {
         {feature(t('payFeatSync'))}
       </div>
 
-      {/* Annual first — it's the value we steer toward — with a savings chip. */}
-      <button disabled={!!busy} onClick={() => start('annual')} style={{ ...cloudBtn('primary'), opacity: busy && busy !== 'annual' ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      {/* Order is deliberate and it is not the usual one. Where a one-time unlock
+          exists it leads, because it is BOTH the cheapest option and the only one
+          with no recurring charge, and HCBS eligibility runs through Medicaid — a
+          forgotten monthly charge lands on someone living on roughly SSI. It also
+          happens to be the rational pick already: lifetime undercuts a year by 4x,
+          so burying it never laddered anyone up, it only overcharged whoever did
+          not scroll. Subscriptions stay, demoted, under their own heading.
+          Web has no one-time product yet, so web keeps annual-first. */}
+      {leadLifetime && (
+        <>
+          <button disabled={!!busy} onClick={() => start('lifetime')} style={{ ...cloudBtn('primary'), opacity: busy && busy !== 'lifetime' ? 0.6 : 1 }}>
+            {busy === 'lifetime' ? t('payStarting') : lifetimeLabel}
+          </button>
+          <div style={{ fontSize: 12, color: C.sub, fontWeight: 600, textAlign: 'center', margin: '8px 2px 0' }}>{t('payLifetimeNote')}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '18px 2px 12px' }}>
+            <span style={{ flex: 1, height: 1, background: C.line }} />
+            <span style={{ fontSize: 12, color: C.sub }}>{t('paySubsHeading')}</span>
+            <span style={{ flex: 1, height: 1, background: C.line }} />
+          </div>
+        </>
+      )}
+
+      <button disabled={!!busy} onClick={() => start('annual')} style={{ ...cloudBtn(leadLifetime ? 'secondary' : 'primary'), opacity: busy && busy !== 'annual' ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         {busy === 'annual' ? t('payStarting') : annualLabel}
         {busy !== 'annual' && savingsText && (
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: '#fff', borderRadius: 999, padding: '2px 8px' }}>{savingsText}</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: leadLifetime ? C.accentSoft : '#fff', borderRadius: 999, padding: '2px 8px' }}>{savingsText}</span>
         )}
       </button>
       <button disabled={!!busy} onClick={() => start('monthly')} style={{ ...cloudBtn('secondary'), marginTop: 10, opacity: busy && busy !== 'monthly' ? 0.6 : 1 }}>
         {busy === 'monthly' ? t('payStarting') : monthlyLabel}
       </button>
-
-      {/* One-time lifetime unlock — quiet tertiary option, native only. */}
-      {nativeIap && (
-        <button disabled={!!busy} onClick={() => start('lifetime')} style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: C.sub, marginTop: 12, padding: 4, opacity: busy && busy !== 'lifetime' ? 0.6 : 1 }}>
-          {busy === 'lifetime' ? t('payStarting') : lifetimeLabel}
-        </button>
-      )}
 
       {trialDays > 0 && (
         <div style={{ fontSize: 12, color: C.accent, fontWeight: 600, textAlign: 'center', margin: '10px 2px 0' }}>{t('payTrialLine', { days: trialDays })}</div>
