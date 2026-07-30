@@ -98,6 +98,54 @@ const C = {
   cloudOk: '#2E8B40', // brighter "sync is working" green - the portfolio-wide cloud cue (GuestBook/BlackBook)
 }
 
+// ─── Shared surface tokens ────────────────────────────────────────────────────
+// The card / row / label recipes below were written out inline at ~30 call sites,
+// and drifted the way duplicated style always does: eight corner radii for four
+// kinds of surface, three sizes of the same uppercase section label, two chevron
+// colours for the same "this opens a page" affordance. One definition each, so a
+// change lands everywhere and a new screen can't invent a ninth radius.
+const R = {
+  hero: 18,    // the big full-width sorter cards (HubHero)
+  tile: 16,    // square hub tiles + feature cards
+  card: 14,    // the default: content cards and tappable list rows
+  control: 12, // buttons, inputs, icon buttons
+  inner: 10,   // controls nested inside a card (segmented choices)
+  pill: 999,
+}
+const CARD_SHADOW = '0 1px 2px rgba(43,42,40,0.04)'
+// A raised surface: white, real border, one soft shadow. Callers add their own
+// padding and margin - only the surface itself is shared.
+const cardStyle = (radius = R.card) => ({
+  background: C.card,
+  border: `1px solid ${C.border}`,
+  borderRadius: radius,
+  boxShadow: CARD_SHADOW,
+})
+// A tappable card: the same surface, reset as a button.
+const cardBtnStyle = (radius = R.card) => ({
+  ...cardStyle(radius),
+  width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+})
+// The quiet uppercase run-in above a group. Callers set their own margin.
+const sectionLabel = { fontSize: 12, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.6 }
+// The label above a field. `margin` covers the gap from the field above it too,
+// so a stack of labelled fields spaces itself.
+const fieldLabelStyle = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
+// A tinted aside: the accent wash used for "worth knowing" notes inside a flow.
+const noteStyle = {
+  background: C.accentSoft, border: `1px solid ${C.accent}33`, borderRadius: R.card,
+  padding: '13px 14px', fontSize: 13, color: C.ink, lineHeight: 1.5,
+}
+// One segmented choice button (yes/no/unsure, Browse/Compare, the auto-lock grid).
+// `tone` is the colour it takes when chosen; unchosen is always the quiet card.
+const segBtnStyle = (active, tone = C.accent, bg = C.accentSoft) => ({
+  padding: '9px 6px', borderRadius: R.inner, fontSize: 13, fontWeight: 700,
+  cursor: 'pointer', fontFamily: 'inherit', minHeight: 44,
+  border: `1px solid ${active ? tone : C.border}`,
+  background: active ? bg : C.card,
+  color: active ? tone : C.sub,
+})
+
 const IS_TOUCH = typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)')?.matches
 
 // Bottom clearance so scrolled content / the composer never hides behind the
@@ -1055,7 +1103,7 @@ class AppErrorBoundary extends React.Component {
     const msg = String(this.state.error?.message || this.state.error || 'Unknown error')
     return (
       <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <div style={{ maxWidth: 420, width: '100%', background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: 20, textAlign: 'center' }}>
+        <div style={{ ...cardStyle(R.tile), maxWidth: 420, width: '100%', padding: 20, textAlign: 'center' }}>
           <div style={{ fontFamily: serif, fontSize: 22, fontWeight: 700, color: C.ink, marginBottom: 8 }}>Something went wrong</div>
           <div style={{ fontSize: 15, color: C.sub, lineHeight: 1.5, marginBottom: 14 }}>
             The app hit an error it couldn't recover from. Your data is safe on this device.
@@ -1630,7 +1678,7 @@ function Chat({ messages, activeId, busy, error, onSend, onCancel, onNew, stateC
                 <div style={{ fontSize: 14, color: C.sub, marginBottom: 10 }}>{t('tryAsking')}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {STARTER_KEYS.map((k) => (
-                    <button key={k} onClick={() => submit(t(k))} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.ink, borderRadius: 12, padding: '10px 13px', minHeight: 44, display: 'inline-flex', alignItems: 'center', fontSize: 14, cursor: 'pointer', textAlign: 'left', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+                    <button key={k} onClick={() => submit(t(k))} style={{ ...cardBtnStyle(R.control), width: 'auto', color: C.ink, padding: '10px 13px', minHeight: 44, display: 'inline-flex', alignItems: 'center', fontSize: 14 }}>
                       {t(k)}
                     </button>
                   ))}
@@ -1653,7 +1701,7 @@ function Chat({ messages, activeId, busy, error, onSend, onCancel, onNew, stateC
             {!busy && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, margin: '2px 0 6px' }}>
                 {['chipSimpler', 'chipExample'].map((k) => (
-                  <button key={k} onClick={() => submit(t(k))} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.accent, borderRadius: 999, padding: '7px 12px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <button key={k} onClick={() => submit(t(k))} style={{ ...cardBtnStyle(R.pill), width: 'auto', boxShadow: 'none', color: C.accent, padding: '7px 12px', fontSize: 13, fontWeight: 600 }}>
                     {t(k)}
                   </button>
                 ))}
@@ -1886,7 +1934,7 @@ function CompareBlock({ compare, baseState, onCompare }) {
         </div>
       )}
       {compare && (
-        <div style={{ marginTop: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 13px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <div style={{ ...cardStyle(R.control), marginTop: 6, padding: '10px 13px' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 4 }}>
             {stateName(compare.state)}{stateCovered(compare.state) ? '' : ` · ${t('federalOnly')}`}
           </div>
@@ -1999,7 +2047,7 @@ function History({ conversations, onOpen, onDelete, embedded, connected }) {
     <Wrap {...wrapProps}>
       {!embedded && <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: '4px 0 10px' }}>{t('savedQuestions')}</div>}
       {conversations.length === 0 ? (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
+        <div style={{ ...cardStyle(), padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
           {t('historyEmpty')}
         </div>
       ) : (
@@ -2014,7 +2062,7 @@ function History({ conversations, onOpen, onDelete, embedded, connected }) {
               onTap={() => onOpen(conv.id)}
               actions={[{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDelete(conv.id) }]}
             >
-              <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+              <div style={{ ...cardStyle(), display: 'flex', alignItems: 'stretch', overflow: 'hidden' }}>
                 <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', textAlign: 'left', cursor: 'pointer' }}>
                   <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{firstQ}</div>
                   <div style={{ fontSize: 12, color: C.sub, marginTop: 3 }}>{timeAgo(conv.createdAt, t)} · {qCount} {qCount > 1 ? t('questionN') : t('question1')}</div>
@@ -2068,10 +2116,10 @@ function GlossarySheet({ onClose, stateCode }) {
   const fedHits = FEDERAL_TERMS.filter(match)
 
   const sectionHead = (label) => (
-    <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: C.sub, margin: '18px 2px 8px' }}>{label}</div>
+    <div style={{ ...sectionLabel, margin: '18px 2px 8px' }}>{label}</div>
   )
   const row = (e) => (
-    <div key={e.term} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '12px 14px', marginBottom: 8, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+    <div key={e.term} style={{ ...cardStyle(), padding: '12px 14px', marginBottom: 8 }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>
         {e.term}
         {e.full && <span style={{ fontWeight: 400, color: C.sub }}> · {e.full}</span>}
@@ -2167,7 +2215,7 @@ const IcHeart = ({ size = 24, style }) => (
 
 function ServiceCodeList({ codes }) {
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '6px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+    <div style={{ ...cardStyle(), padding: '6px 14px' }}>
       {codes.map((s, i) => (
         <div key={s.code} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>
@@ -2277,7 +2325,7 @@ function GroupedRights({ groups }) {
           {g.cards.map((c) => {
             const isOpen = open === c.id
             return (
-              <div key={c.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, marginBottom: 8, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+              <div key={c.id} style={{ ...cardStyle(), marginBottom: 8, overflow: 'hidden' }}>
                 <button
                   onClick={() => setOpen(isOpen ? null : c.id)}
                   aria-expanded={isOpen}
@@ -2313,14 +2361,14 @@ function StateBody({ code }) {
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>{t('rtStateIntro', { name })}</div>
       {groups
         ? <GroupedRights groups={groups} />
-        : <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px 16px', fontSize: 14, color: C.ink, lineHeight: 1.6, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>{t('statePackMissing', { name })}</div>}
+        : <div style={{ ...cardStyle(), padding: '16px', fontSize: 14, color: C.ink, lineHeight: 1.6 }}>{t('statePackMissing', { name })}</div>}
     </>
   )
 }
 // Big full-width hub card (the state / federal "sorter").
 function HubHero({ icon: Icon, title, sub, onClick }) {
   return (
-    <button onClick={onClick} style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%', textAlign: 'left', background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, boxShadow: '0 1px 2px rgba(43,42,40,0.04)', padding: '16px 15px', marginBottom: 12, cursor: 'pointer', fontFamily: 'inherit' }}>
+    <button onClick={onClick} style={{ ...cardBtnStyle(R.hero), display: 'flex', alignItems: 'center', gap: 14, padding: '16px 15px', marginBottom: 12 }}>
       <span style={{ width: 48, height: 48, borderRadius: 14, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon size={24} /></span>
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{ display: 'block', fontSize: 17, fontWeight: 700, color: C.ink, lineHeight: 1.2 }}>{title}</span>
@@ -2402,7 +2450,7 @@ function CompareStates({ currentCode, onOpen }) {
       {res && res.matched === 0 && (
         // The honest empty state. Saying "no state addresses this" would be a claim we
         // cannot support; what we actually know is that our corpus has nothing.
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '16px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <div style={{ ...cardStyle(), padding: '16px' }}>
           <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.55 }}>{t('csNothing')}</div>
           {res.unmatchedTerms.length > 0 && (
             <div style={{ fontSize: 12.5, color: C.sub, marginTop: 8, lineHeight: 1.5 }}>
@@ -2420,7 +2468,7 @@ function CompareStates({ currentCode, onOpen }) {
           {res.hits.map((h) => (
             <button
               key={h.code} onClick={() => onOpen(h.code)}
-              style={{ width: '100%', textAlign: 'left', display: 'block', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 8, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}
+              style={{ ...cardBtnStyle(), display: 'block', padding: '13px 14px', marginBottom: 8 }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                 <span style={{ fontSize: 15, fontWeight: 700, color: C.ink }}>{h.name}</span>
@@ -2477,8 +2525,7 @@ function OtherStatesSheet({ currentCode, onClose }) {
     return (
       <button
         key={id} onClick={() => setMode(id)} aria-pressed={on}
-        style={{ flex: 1, padding: '9px 8px', borderRadius: 10, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
-          border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accentSoft : C.card, color: on ? C.accent : C.sub }}
+        style={{ ...segBtnStyle(on), flex: 1, fontSize: 14 }}
       >{label}</button>
     )
   }
@@ -2496,7 +2543,7 @@ function OtherStatesSheet({ currentCode, onClose }) {
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('rtOthersIntro')}</div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('rtSearchStates')} aria-label={t('rtSearchStates')} style={{ ...inputStyle, marginBottom: 12 }} />
       {list.map((o) => (
-        <button key={o.value} onClick={() => setSel(o.value)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, background: C.card, border: `1px solid ${C.border}`, borderRadius: 13, padding: '13px 14px', marginBottom: 8, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <button key={o.value} onClick={() => setSel(o.value)} style={{ ...cardBtnStyle(), display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '13px 14px', marginBottom: 8 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{o.label}</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {stateCovered(o.value) && <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, background: C.accentSoft, borderRadius: 999, padding: '2px 8px' }}>{t('stateGuide')}</span>}
@@ -2520,7 +2567,7 @@ function WhereToStartSheet({ code, onClose }) {
   const g = STATE_GUIDE[code]
   if (!g) return null
   const linkBtn = (kind) => ({ ...cloudBtn(kind), textDecoration: 'none', textAlign: 'center', display: 'block' })
-  const secTitle = { fontSize: 12, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.6, margin: '20px 2px 8px' }
+  const secTitle = { ...sectionLabel, margin: '20px 2px 8px' }
   return (
     <Modal onClose={onClose} title={t('rtTileStart')}>
       <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 14 }}>{g.entry.what}</div>
@@ -2531,7 +2578,7 @@ function WhereToStartSheet({ code, onClose }) {
       <a href={g.start.url} target="_blank" rel="noreferrer" style={linkBtn('secondary')}>{t('wtsVisit')}</a>
 
       <div style={secTitle}>{t('wtsWhoRuns')}</div>
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+      <div style={{ ...cardStyle(), padding: '13px 14px' }}>
         <a href={g.agency.url} target="_blank" rel="noreferrer" style={{ fontSize: 15, fontWeight: 600, color: C.accent, textDecoration: 'none' }}>{g.agency.name}</a>
         <div style={{ fontSize: 13, color: C.sub, marginTop: 6, lineHeight: 1.5 }}><span style={{ fontWeight: 700, color: C.ink }}>{t('wtsPrograms')}:</span> {g.waivers}</div>
       </div>
@@ -2585,7 +2632,7 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
           safeguards. Calm card treatment so the pair doesn't shout. */}
       <button
         onClick={() => setShowRmc(true)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 14, margin: '-8px 0 18px', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}
+        style={{ ...cardBtnStyle(R.tile), display: 'flex', alignItems: 'center', gap: 12, padding: 14, margin: '-8px 0 18px' }}
       >
         <span style={{ width: 42, height: 42, borderRadius: 12, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcShield size={22} /></span>
         <span style={{ flex: 1, minWidth: 0 }}>
@@ -2595,7 +2642,7 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
         <IcChevron dir="right" size={18} style={{ color: C.accent, flexShrink: 0 }} />
       </button>
 
-      <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.5, margin: '0 2px 8px' }}>{t('rtWhereLive')}</div>
+      <div style={{ ...sectionLabel, margin: '0 2px 8px' }}>{t('rtWhereLive')}</div>
       <div style={{ marginBottom: 18 }}>
         <Select value={stateCode} onChange={onStateChange} options={STATE_OPTIONS} ariaLabel={t('yourState')} />
       </div>
@@ -2625,7 +2672,7 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
           weight it competed with "your state" and "federal" for the same attention. */}
       <button
         onClick={() => setView('others')}
-        style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%', textAlign: 'left', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(43,42,40,0.04)', padding: '12px 14px', marginTop: 12, cursor: 'pointer', fontFamily: 'inherit' }}
+        style={{ ...cardBtnStyle(), display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginTop: 12 }}
       >
         <span style={{ width: 34, height: 34, borderRadius: 10, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcGlobe size={18} /></span>
         <span style={{ minWidth: 0, flex: 1 }}>
@@ -2677,13 +2724,13 @@ function RegionalCenters() {
   const countyOptions = COUNTIES.map((c) => ({ value: c, label: c }))
   const phoneHref = (p) => `tel:+1${p.replace(/\D/g, '')}`
   const linkStyle = { color: C.accent, fontWeight: 600, textDecoration: 'none' }
-  const cardStyle = { background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: '15px 16px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }
+  const centerCard = { ...cardStyle(R.tile), padding: '15px 16px' }
 
   return (
     <>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('rcIntro')}</div>
 
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: 12, marginBottom: 14 }}>
+      <div style={{ ...cardStyle(R.tile), padding: 12, marginBottom: 14 }}>
         <svg viewBox={CA_MAP.viewBox} role="img" aria-label={t('rcMapAria')} style={{ width: '100%', height: 'auto', maxHeight: '44vh', display: 'block' }}>
           {COUNTIES.map((n) => {
             const on = highlight.has(n)
@@ -2697,14 +2744,14 @@ function RegionalCenters() {
         </svg>
       </div>
 
-      <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>{t('rcYourCounty')}</label>
+      <label style={{ ...fieldLabelStyle, marginTop: 0 }}>{t('rcYourCounty')}</label>
       <Select value={county} onChange={setCounty} options={countyOptions} placeholder={t('rcCountyPh')} ariaLabel={t('rcYourCounty')} />
 
       <div style={{ marginTop: 14 }}>
         {!county && <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, padding: '0 2px' }}>{t('rcPickPrompt')}</div>}
 
         {center && (
-          <div style={cardStyle}>
+          <div style={centerCard}>
             <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.ink, lineHeight: 1.3 }}>{center.name}</div>
             <a href={phoneHref(center.phone)} style={{ ...linkStyle, display: 'inline-block', fontSize: 16, marginTop: 8 }}>{center.phone}</a>
             <div style={{ marginTop: 6 }}>
@@ -2717,7 +2764,7 @@ function RegionalCenters() {
         )}
 
         {isLA && (
-          <div style={cardStyle}>
+          <div style={centerCard}>
             <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.55, marginBottom: 12 }}>{t('rcLaIntro')}</div>
             {LA_CENTERS.map((c, i) => (
               <div key={c.name} style={{ padding: '10px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
@@ -2857,6 +2904,50 @@ const telHref = (phone) => {
 const escapeHtml = (s) => String(s || '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 
+// Shared print-doc chrome for every page the app opens in a new tab: the
+// complaint packet, the two self-check summaries and the request letters. These
+// render as a Blob in a tab where no app CSS is available, so the rules are
+// written out longhand - but ONCE. It used to be pasted twice, and the two
+// copies had already drifted apart on the grey they used for citations.
+const PRINT_CSS = `
+  :root { -webkit-text-size-adjust: 100%; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #f4f3f1; color: #2b2a28; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .page { max-width: 720px; margin: 0 auto; padding: 28px 22px 60px; }
+  .bar { position: sticky; top: 0; background: #f4f3f1; padding: 12px 0; }
+  .print-btn { width: 100%; border: none; background: #2e7d74; color: #fff; font-size: 16px; font-weight: 700; padding: 14px; border-radius: 12px; cursor: pointer; }
+  h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; margin: 6px 0 2px; }
+  h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; margin: 22px 0 10px; }
+  .setting { font-size: 13px; color: #6e6a64; margin-bottom: 12px; }
+  .intro { font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
+  .inc { border: 1px solid #d9d5ce; border-radius: 10px; padding: 11px 13px; margin-bottom: 10px; background: #fff; }
+  .inc-what { font-size: 15px; font-weight: 700; line-height: 1.5; }
+  .inc-meta { font-size: 13px; color: #4a4843; margin-top: 5px; line-height: 1.5; }
+  .inc-meta .lbl { font-weight: 700; color: #2e7d74; }
+  .cite-sm { font-size: 11px; color: #726d66; margin-top: 5px; }
+  .date { font-size: 14px; color: #4a4843; margin-bottom: 18px; }
+  .rline { font-size: 14px; line-height: 1.5; margin-bottom: 14px; white-space: pre-wrap; }
+  .salute { font-size: 14px; margin: 14px 0 10px; }
+  p { font-size: 14px; line-height: 1.65; margin: 0 0 12px; }
+  .sig { font-size: 14px; font-weight: 700; margin-top: 4px; }
+  .foot { font-size: 11px; color: #726d66; margin-top: 26px; border-top: 1px solid #d9d5ce; padding-top: 10px; }
+  @media print { body { background: #fff; } .bar { display: none; } .page { max-width: none; padding: 0; } .inc { break-inside: avoid; } }
+`
+
+// The packet is the one doc with fill-in-by-hand fields, and its incident cards
+// lead with the DATE rather than the description - so it appends its own rules
+// after the shared base instead of restating it.
+const PACKET_CSS = `${PRINT_CSS}
+  .cite { font-size: 13px; color: #6e6a64; margin-bottom: 16px; }
+  .field { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; font-size: 14px; }
+  .flabel { color: #6e6a64; white-space: nowrap; }
+  .blank { flex: 1; border-bottom: 1px solid #b3aea6; min-height: 18px; }
+  .inc-date { font-size: 12px; font-weight: 700; color: #2e7d74; }
+  .inc-what { font-size: 14px; font-weight: 400; line-height: 1.5; margin-top: 3px; white-space: pre-wrap; }
+  .inc-meta { font-size: 12px; color: #6e6a64; margin-top: 4px; }
+  .file { font-size: 14px; line-height: 1.6; }
+`
+
 // Build a self-contained, print-ready HTML document from the incident log. The
 // packet is the whole point of keeping incidents: a dated, formatted complaint
 // the person can save as a PDF and file. CA gets the WIC 4731 framing; other
@@ -2879,33 +2970,7 @@ function buildPacketHtml(incidents, t, isCA) {
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
-<style>
-  :root { -webkit-text-size-adjust: 100%; }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: #f4f3f1; color: #2b2a28; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-  .page { max-width: 720px; margin: 0 auto; padding: 28px 22px 60px; }
-  .bar { position: sticky; top: 0; background: #f4f3f1; padding: 12px 0; }
-  .print-btn { width: 100%; border: none; background: #2e7d74; color: #fff; font-size: 16px; font-weight: 700; padding: 14px; border-radius: 12px; cursor: pointer; }
-  h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; margin: 6px 0 2px; }
-  .cite { font-size: 13px; color: #6e6a64; margin-bottom: 16px; }
-  .intro { font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
-  h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; margin: 22px 0 10px; }
-  .field { display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; font-size: 14px; }
-  .flabel { color: #6e6a64; white-space: nowrap; }
-  .blank { flex: 1; border-bottom: 1px solid #b3aea6; min-height: 18px; }
-  .inc { border: 1px solid #d9d5ce; border-radius: 10px; padding: 11px 13px; margin-bottom: 10px; background: #fff; }
-  .inc-date { font-size: 12px; font-weight: 700; color: #2e7d74; }
-  .inc-what { font-size: 14px; line-height: 1.5; margin-top: 3px; white-space: pre-wrap; }
-  .inc-meta { font-size: 12px; color: #6e6a64; margin-top: 4px; }
-  .file { font-size: 14px; line-height: 1.6; }
-  .foot { font-size: 11px; color: #8a857d; margin-top: 26px; border-top: 1px solid #d9d5ce; padding-top: 10px; }
-  @media print {
-    body { background: #fff; }
-    .bar { display: none; }
-    .page { max-width: none; padding: 0; }
-    .inc { break-inside: avoid; }
-  }
-</style></head>
+<style>${PACKET_CSS}</style></head>
 <body><div class="page">
   <div class="bar"><button class="print-btn" onclick="window.print()">${escapeHtml(t('packetPrint'))}</button></div>
   <h1>${escapeHtml(title)}</h1>
@@ -2937,33 +3002,6 @@ function openPacket(incidents, t, isCA) {
   return true
 }
 
-// Shared print-doc chrome for the self-check summary and the request letters
-// (same look as the complaint packet). Self-contained: these open as a Blob in
-// a new tab where no app CSS is available.
-const PRINT_CSS = `
-  :root { -webkit-text-size-adjust: 100%; }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: #f4f3f1; color: #2b2a28; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
-  .page { max-width: 720px; margin: 0 auto; padding: 28px 22px 60px; }
-  .bar { position: sticky; top: 0; background: #f4f3f1; padding: 12px 0; }
-  .print-btn { width: 100%; border: none; background: #2e7d74; color: #fff; font-size: 16px; font-weight: 700; padding: 14px; border-radius: 12px; cursor: pointer; }
-  h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 24px; margin: 6px 0 2px; }
-  h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; margin: 22px 0 10px; }
-  .setting { font-size: 13px; color: #6e6a64; margin-bottom: 12px; }
-  .intro { font-size: 14px; line-height: 1.6; margin: 0 0 18px; }
-  .inc { border: 1px solid #d9d5ce; border-radius: 10px; padding: 11px 13px; margin-bottom: 10px; background: #fff; }
-  .inc-what { font-size: 15px; font-weight: 700; line-height: 1.5; }
-  .inc-meta { font-size: 13px; color: #4a4843; margin-top: 5px; line-height: 1.5; }
-  .inc-meta .lbl { font-weight: 700; color: #2e7d74; }
-  .cite-sm { font-size: 11px; color: #8a857d; margin-top: 5px; }
-  .date { font-size: 14px; color: #4a4843; margin-bottom: 18px; }
-  .rline { font-size: 14px; line-height: 1.5; margin-bottom: 14px; white-space: pre-wrap; }
-  .salute { font-size: 14px; margin: 14px 0 10px; }
-  p { font-size: 14px; line-height: 1.65; margin: 0 0 12px; }
-  .sig { font-size: 14px; font-weight: 700; margin-top: 4px; }
-  .foot { font-size: 11px; color: #8a857d; margin-top: 26px; border-top: 1px solid #d9d5ce; padding-top: 10px; }
-  @media print { body { background: #fff; } .bar { display: none; } .page { max-width: none; padding: 0; } .inc { break-inside: avoid; } }
-`
 const openHtmlDoc = (html) => {
   const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }))
   const win = window.open(url, '_blank')
@@ -3328,7 +3366,7 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded, readOnly })
       )}
       <CloudNote error={error} />
       {docs.length === 0 ? (
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55, marginTop: 6 }}>
+        <div style={{ ...cardStyle(), padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55, marginTop: 6 }}>
           {t('docsEmpty')}
         </div>
       ) : (
@@ -3344,7 +3382,7 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded, readOnly })
             </div>
           )}
           {files.map((doc) => (
-            <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, boxShadow: '0 1px 2px rgba(43,42,40,0.04)', padding: '10px 12px', marginTop: 8 }}>
+            <div key={doc.id} style={{ ...cardStyle(), display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', marginTop: 8 }}>
               <button onClick={() => openDoc(doc)} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12, background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
                 <DocThumb doc={doc} cloud={cloud} />
                 <span style={{ flex: 1, minWidth: 0 }}>
@@ -3386,7 +3424,7 @@ function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud, readOnly })
   const [error, setError] = useState('')
   const [lb, setLb] = useState(null)
   const photoInput = useRef(null)
-  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
+  const fieldLabel = fieldLabelStyle
   const photoDocs = photoIds.map((id) => vaultDocs.docs.find((d) => d.id === id)).filter(Boolean)
 
   const onPickPhoto = async (e) => {
@@ -3480,7 +3518,7 @@ function DeadlineForm({ initial, onSave, onCancel, isCA, readOnly }) {
   const [label, setLabel] = useState(initial?.label || '')
   const [days, setDays] = useState(initial?.days ? String(initial.days) : (isCA ? '60' : '30'))
   const [error, setError] = useState('')
-  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
+  const fieldLabel = fieldLabelStyle
   const trackOptions = [
     { value: 'rc', label: t('trackRC') },
     { value: 'medical', label: t('trackMedical') },
@@ -3557,11 +3595,11 @@ function RmcSheet({ onClose, onSaveIncident }) {
       {['yes', 'no', 'unsure'].map((v) => {
         const active = answers[id] === v
         const col = v === 'yes' ? C.accent : v === 'no' ? C.danger : C.sub
-        const bg = !active ? C.card : v === 'yes' ? C.accentSoft : v === 'no' ? C.dangerSoft : C.bg
+        const bg = v === 'yes' ? C.accentSoft : v === 'no' ? C.dangerSoft : C.bg
         return (
           <button
             key={v} onClick={() => setAnswers((a) => ({ ...a, [id]: v }))} aria-pressed={active}
-            style={{ flex: 1, padding: '9px 6px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${active ? col : C.border}`, background: bg, color: active ? col : C.sub }}
+            style={{ ...segBtnStyle(active, col, bg), flex: 1 }}
           >
             {t(v === 'yes' ? 'hcYes' : v === 'no' ? 'hcNo' : 'hcUnsure')}
           </button>
@@ -3580,7 +3618,7 @@ function RmcSheet({ onClose, onSaveIncident }) {
     setSaved(true)
   }
   const openSummary = () => { setErr(''); if (!openRmc(missing, blanket, whatLabel, t)) setErr(t('packetOpenFailed')) }
-  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
+  const fieldLabel = fieldLabelStyle
   const resultCard = (bg, border) => ({ background: bg, border: `1px solid ${border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 10, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' })
 
   if (showResults) {
@@ -3632,7 +3670,7 @@ function RmcSheet({ onClose, onSaveIncident }) {
         options={[{ value: 'provider', label: t('hcSettingProvider') }, { value: 'home', label: t('hcSettingHome') }]}
       />
       {setting === 'home' && (
-        <div style={{ background: C.accentSoft, border: `1px solid ${C.accent}33`, borderRadius: 12, padding: '11px 13px', fontSize: 13, color: C.ink, lineHeight: 1.5, marginTop: 10 }}>
+        <div style={{ ...noteStyle, marginTop: 10 }}>
           {t('rmcHomeNote')}
         </div>
       )}
@@ -3641,9 +3679,9 @@ function RmcSheet({ onClose, onSaveIncident }) {
         value={scope} onChange={setScope} ariaLabel={t('rmcScope')}
         options={[{ value: 'all', label: t('rmcScopeAll') }, { value: 'me', label: t('rmcScopeMe') }, { value: 'unsure', label: t('rmcScopeUnsure') }]}
       />
-      <div style={{ fontSize: 13, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.5, margin: '18px 0 10px' }}>{t('rmcQuestionsTitle')}</div>
+      <div style={{ ...sectionLabel, margin: '18px 2px 10px' }}>{t('rmcQuestionsTitle')}</div>
       {RMC_ITEMS.map((it) => (
-        <div key={it.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 10, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <div key={it.id} style={{ ...cardStyle(), padding: '13px 14px', marginBottom: 10 }}>
           <div style={{ fontSize: 15, color: C.ink, lineHeight: 1.4 }}>{t(`rm_${it.id}_q`)}</div>
           {choiceRow(it.id)}
         </div>
@@ -3673,11 +3711,11 @@ function HomeCheckSheet({ onClose, onSaveIncident }) {
       {['yes', 'no', 'unsure'].map((v) => {
         const active = answers[id] === v
         const col = v === 'yes' ? C.accent : v === 'no' ? C.danger : C.sub
-        const bg = !active ? C.card : v === 'yes' ? C.accentSoft : v === 'no' ? C.dangerSoft : C.bg
+        const bg = v === 'yes' ? C.accentSoft : v === 'no' ? C.dangerSoft : C.bg
         return (
           <button
             key={v} onClick={() => setAnswers((a) => ({ ...a, [id]: v }))} aria-pressed={active}
-            style={{ flex: 1, padding: '9px 6px', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', border: `1px solid ${active ? col : C.border}`, background: bg, color: active ? col : C.sub }}
+            style={{ ...segBtnStyle(active, col, bg), flex: 1 }}
           >
             {t(v === 'yes' ? 'hcYes' : v === 'no' ? 'hcNo' : 'hcUnsure')}
           </button>
@@ -3698,12 +3736,12 @@ function HomeCheckSheet({ onClose, onSaveIncident }) {
     return (
       <Modal onClose={onClose} title={t('homeCheck')}>
         {flagged.length === 0 ? (
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.ink, lineHeight: 1.55 }}>{t('hcResultsNone')}</div>
+          <div style={{ ...cardStyle(), padding: '18px 16px', fontSize: 14, color: C.ink, lineHeight: 1.55 }}>{t('hcResultsNone')}</div>
         ) : (
           <>
             <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.55, marginBottom: 14 }}>{t('hcResultsIntro', { n: flagged.length })}</div>
             {flagged.map((f) => (
-              <div key={f.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 10, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+              <div key={f.id} style={{ ...cardStyle(), padding: '13px 14px', marginBottom: 10 }}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: C.ink, lineHeight: 1.4 }}>{t(`hc_${f.id}_q`)}</div>
                 <div style={{ fontSize: 13, color: C.sub, marginTop: 7, lineHeight: 1.5 }}><span style={{ fontWeight: 700, color: C.accent }}>{t('hcYourRight')}:</span> {t(`hc_${f.id}_r`)}</div>
                 <div style={{ fontSize: 13, color: C.sub, marginTop: 5, lineHeight: 1.5 }}><span style={{ fontWeight: 700, color: C.accent }}>{t('hcAskFor')}:</span> {t(`hc_${f.id}_a`)}</div>
@@ -3726,11 +3764,11 @@ function HomeCheckSheet({ onClose, onSaveIncident }) {
   return (
     <Modal onClose={onClose} title={t('homeCheck')}>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 14 }}>{t('hcIntro')}</div>
-      <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>{t('hcSetting')}</label>
+      <label style={{ ...fieldLabelStyle, marginTop: 0 }}>{t('hcSetting')}</label>
       <Select value={setting} onChange={setSetting} options={settingOptions} ariaLabel={t('hcSetting')} />
       <div style={{ marginTop: 16 }}>
         {items.map((it) => (
-          <div key={it.id} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '13px 14px', marginBottom: 10, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+          <div key={it.id} style={{ ...cardStyle(), padding: '13px 14px', marginBottom: 10 }}>
             <div style={{ fontSize: 15, color: C.ink, lineHeight: 1.4 }}>{t(`hc_${it.id}_q`)}</div>
             {choiceRow(it.id)}
           </div>
@@ -3752,7 +3790,7 @@ function LettersView() {
   const [recipient, setRecipient] = useState('')
   const [details, setDetails] = useState('')
   const [err, setErr] = useState('')
-  const fieldLabel = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
+  const fieldLabel = fieldLabelStyle
 
   if (!picked) {
     return (
@@ -3761,10 +3799,10 @@ function LettersView() {
         {LETTER_TEMPLATES.map((tpl) => (
           <button
             key={tpl.id} onClick={() => setPicked(tpl.id)}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '14px', marginBottom: 10, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}
+            style={{ ...cardBtnStyle(), display: 'flex', alignItems: 'center', gap: 12, padding: 14, marginBottom: 10 }}
           >
             <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>{t(`lt_${tpl.id}_title`)}</span>
-            <IcChevron dir="right" size={18} style={{ color: C.ink3, flexShrink: 0 }} />
+            <IcChevron dir="right" size={18} style={{ color: C.accent, flexShrink: 0 }} />
           </button>
         ))}
       </>
@@ -3817,7 +3855,7 @@ function ContactsCard({ stateCode }) {
       {!(code === 'CA' || guide) && (
         <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 10 }}>{t('contactsNote')}</div>
       )}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '6px 14px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+      <div style={{ ...cardStyle(), padding: '6px 14px' }}>
         {list.map((c, i) => (
           <div key={c.name} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
             <div style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{c.name}</div>
@@ -3840,10 +3878,9 @@ function ContactsCard({ stateCode }) {
 function VaultTile({ icon, label, sub, onClick }) {
   return (
     <button onClick={onClick} style={{
-      background: C.card, border: `1px solid ${C.border}`, borderRadius: 16,
-      boxShadow: '0 1px 2px rgba(43,42,40,0.04)', cursor: 'pointer',
-      padding: '15px 14px', textAlign: 'left', display: 'flex', flexDirection: 'column',
-      minHeight: 118, fontFamily: 'inherit',
+      ...cardBtnStyle(R.tile),
+      padding: '15px 14px', display: 'flex', flexDirection: 'column',
+      minHeight: 118,
     }}>
       <span style={{ width: 42, height: 42, borderRadius: 12, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</span>
       <span style={{ marginTop: 'auto', paddingTop: 10 }}>
@@ -3963,7 +4000,7 @@ function Paywall({ cloud, onNativePaid }) {
     <div>
       <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('paySub')}</div>
 
-      <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: '18px 16px', marginBottom: 16, boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+      <div style={{ ...cardStyle(R.tile), padding: '18px 16px', marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
           <span style={{ width: 40, height: 40, borderRadius: 11, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IcShield size={20} /></span>
           <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, color: C.ink, lineHeight: 1.15 }}>{t('payTitle')}</div>
@@ -4100,7 +4137,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
   // Close whatever drill-in sheet is open and land back on the hub.
   const closeSheet = () => { setView('hub'); setEditing(null); setEditingDl(null); setPacketError('') }
   const emptyCard = (text) => (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>{text}</div>
+    <div style={{ ...cardStyle(), padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>{text}</div>
   )
   const countText = (n) => (n > 0 ? t('countSaved', { n }) : t('tileEmpty'))
 
@@ -4110,7 +4147,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
       onTap={() => setEditing(inc)}
       actions={readOnly ? [] : [{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => deleteIncident(inc) }]}
     >
-      <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+      <div style={{ ...cardStyle(), display: 'flex', alignItems: 'stretch', overflow: 'hidden' }}>
         <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
           <div style={{ fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{inc.what}</div>
           <div style={{ fontSize: 12, color: C.sub, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -4148,7 +4185,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
         onTap={() => setEditingDl(rec)}
         actions={readOnly ? [] : [{ label: t('delete'), color: C.danger, icon: <IcTrash size={18} />, onClick: () => onDeleteDeadline(rec.id) }]}
       >
-        <div style={{ display: 'flex', alignItems: 'stretch', background: C.card, border: `1px solid ${C.border}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <div style={{ ...cardStyle(), display: 'flex', alignItems: 'stretch', overflow: 'hidden' }}>
           <div style={{ flex: 1, minWidth: 0, padding: '13px 14px', cursor: 'pointer' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
               <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, color: C.ink, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
@@ -4183,7 +4220,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
       <VaultScrollPage kbInset={kbInset}>
         <PageTitle>{t('navVault')}</PageTitle>
         <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{t('vaultHubSub')}</div>
-        <div style={{ background: C.card, border: `1px solid ${C.line}`, borderRadius: 16, padding: '16px 14px', margin: '0 0 18px', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+        <div style={{ ...cardStyle(R.tile), padding: '16px 14px', margin: '0 0 18px' }}>
           {cloud.status === 'signed_out' && (
             <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 16 }}>{t('vaultSignedOut')}</div>
           )}
@@ -4217,7 +4254,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
         <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '0 2px 16px' }}>{readOnly ? t('vaultLapsedSub') : t('vaultHubSub')}</div>
         {/* Lapsed: records stay viewable/exportable; a calm banner offers to resume. */}
         {readOnly && (
-          <div style={{ background: C.accentSoft, border: `1px solid ${C.accent}33`, borderRadius: 14, padding: '13px 14px', margin: '0 0 14px' }}>
+          <div style={{ ...noteStyle, margin: '0 0 14px' }}>
             <div style={{ fontSize: 13.5, color: C.ink, lineHeight: 1.5, marginBottom: 10 }}>{t('vaultLapsedBanner')}</div>
             <button onClick={() => setShowPaywall(true)} style={{ ...cloudBtn('primary'), padding: '10px 14px', fontSize: 14 }}>{t('vaultResubscribe')}</button>
           </div>
@@ -4303,7 +4340,7 @@ function VaultPage({ cloud, entitled, onNativePaid, incidents, onSaveIncident, o
 function SheetSection({ title, children }) {
   return (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: C.sub, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 8 }}>{title}</div>
+      <div style={{ ...sectionLabel, marginBottom: 8 }}>{title}</div>
       {children}
     </div>
   )
@@ -4492,7 +4529,7 @@ function AuthFlow({ cloud, intro }) {
             <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>{t('signInSub')}</div>
           </>
         )}
-        <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>{t('email')}</label>
+        <label style={{ ...fieldLabelStyle, marginTop: 0 }}>{t('email')}</label>
         <input
           type="email" inputMode="email" autoComplete="email" placeholder="you@example.com"
           value={emailInput} onChange={(e) => setEmailInput(e.target.value)}
@@ -4513,7 +4550,7 @@ function AuthFlow({ cloud, intro }) {
         <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 16 }}>
           {withEmail('codeSentBody')}
         </div>
-        <label style={{ fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', marginBottom: 6 }}>{t('code')}</label>
+        <label style={{ ...fieldLabelStyle, marginTop: 0 }}>{t('code')}</label>
         <input
           type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="12345678" maxLength={10}
           value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
@@ -4614,12 +4651,7 @@ function CloudSheet({ onClose, cloud }) {
             {LOCK_OPTIONS.map((o) => {
               const active = cloud.lockDelay === o.value
               return (
-                <button key={o.value} onClick={() => cloud.setLockDelay(o.value)} style={{
-                  padding: '10px 6px', borderRadius: 10, cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                  border: `1.5px solid ${active ? C.accent : C.border}`,
-                  background: active ? C.accentSoft : C.surface,
-                  color: active ? C.accent : C.sub,
-                }}>{t(o.labelKey)}</button>
+                <button key={o.value} onClick={() => cloud.setLockDelay(o.value)} style={segBtnStyle(active)}>{t(o.labelKey)}</button>
               )
             })}
           </div>
