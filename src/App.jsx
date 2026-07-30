@@ -104,25 +104,31 @@ const C = {
 // kinds of surface, three sizes of the same uppercase section label, two chevron
 // colours for the same "this opens a page" affordance. One definition each, so a
 // change lands everywhere and a new screen can't invent a ninth radius.
+// sm / md / lg / pill are the portfolio scale, byte-identical to the one
+// GuestBook, BlueBook and PerkBook already share - so a value means the same
+// thing in every Book app. `control` and `tile` are RightsBook's own two extra
+// steps: this app shipped its buttons at 12 and its hub tiles at 16, and moving
+// them to fit the scale would shift surfaces that are already in front of
+// people for no gain a reader could see.
 const R = {
-  hero: 18,    // the big full-width sorter cards (HubHero)
-  tile: 16,    // square hub tiles + feature cards
-  card: 14,    // the default: content cards and tappable list rows
+  sm: 10,      // controls nested inside a card (segmented choices)
   control: 12, // buttons, inputs, icon buttons
-  inner: 10,   // controls nested inside a card (segmented choices)
+  md: 14,      // the default: content cards and tappable list rows
+  tile: 16,    // square hub tiles + feature cards
+  lg: 18,      // the big full-width sorter cards (HubHero)
   pill: 999,
 }
 const CARD_SHADOW = '0 1px 2px rgba(43,42,40,0.04)'
 // A raised surface: white, real border, one soft shadow. Callers add their own
 // padding and margin - only the surface itself is shared.
-const cardStyle = (radius = R.card) => ({
+const cardStyle = (radius = R.md) => ({
   background: C.card,
   border: `1px solid ${C.border}`,
   borderRadius: radius,
   boxShadow: CARD_SHADOW,
 })
 // A tappable card: the same surface, reset as a button.
-const cardBtnStyle = (radius = R.card) => ({
+const cardBtnStyle = (radius = R.md) => ({
   ...cardStyle(radius),
   width: '100%', textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
 })
@@ -133,13 +139,13 @@ const sectionLabel = { fontSize: 12, fontWeight: 700, color: C.sub, textTransfor
 const fieldLabelStyle = { fontSize: 13, fontWeight: 600, color: C.sub, display: 'block', margin: '14px 0 6px' }
 // A tinted aside: the accent wash used for "worth knowing" notes inside a flow.
 const noteStyle = {
-  background: C.accentSoft, border: `1px solid ${C.accent}33`, borderRadius: R.card,
+  background: C.accentSoft, border: `1px solid ${C.accent}33`, borderRadius: R.md,
   padding: '13px 14px', fontSize: 13, color: C.ink, lineHeight: 1.5,
 }
 // One segmented choice button (yes/no/unsure, Browse/Compare, the auto-lock grid).
 // `tone` is the colour it takes when chosen; unchosen is always the quiet card.
 const segBtnStyle = (active, tone = C.accent, bg = C.accentSoft) => ({
-  padding: '9px 6px', borderRadius: R.inner, fontSize: 13, fontWeight: 700,
+  padding: '9px 6px', borderRadius: R.sm, fontSize: 13, fontWeight: 700,
   cursor: 'pointer', fontFamily: 'inherit', minHeight: 44,
   border: `1px solid ${active ? tone : C.border}`,
   background: active ? bg : C.card,
@@ -2368,7 +2374,7 @@ function StateBody({ code }) {
 // Big full-width hub card (the state / federal "sorter").
 function HubHero({ icon: Icon, title, sub, onClick }) {
   return (
-    <button onClick={onClick} style={{ ...cardBtnStyle(R.hero), display: 'flex', alignItems: 'center', gap: 14, padding: '16px 15px', marginBottom: 12 }}>
+    <button onClick={onClick} style={{ ...cardBtnStyle(R.lg), display: 'flex', alignItems: 'center', gap: 14, padding: '16px 15px', marginBottom: 12 }}>
       <span style={{ width: 48, height: 48, borderRadius: 14, background: C.accentSoft, color: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon size={24} /></span>
       <span style={{ minWidth: 0, flex: 1 }}>
         <span style={{ display: 'block', fontSize: 17, fontWeight: 700, color: C.ink, lineHeight: 1.2 }}>{title}</span>
