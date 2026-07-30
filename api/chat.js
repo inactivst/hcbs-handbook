@@ -230,28 +230,33 @@ function providerOrder() {
   return raw.filter((name) => PROVIDERS[name] && PROVIDERS[name].available())
 }
 
+// Every failure the client can show a person gets a stable machine `code` next to
+// the English `error`. The app has 469 strings in three languages; without a code
+// the one moment a worried reader most needs plain words in their own language is
+// the one moment they get raw English from a server they cannot see. `error` stays
+// for logs, curl, and any caller that is not the app.
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' })
+    res.status(405).json({ error: 'Method not allowed', code: 'method' })
     return
   }
 
   const order = providerOrder()
   if (order.length === 0) {
-    res.status(500).json({ error: 'Server is not configured yet (no model provider key set).' })
+    res.status(500).json({ error: 'Server is not configured yet (no model provider key set).', code: 'noprovider' })
     return
   }
 
   const gate = rateLimit(clientIp(req), RATE_LIMIT)
   if (!gate.ok) {
     res.setHeader('Retry-After', String(gate.retryAfter))
-    res.status(429).json({ error: 'That is a lot of questions at once. Please wait a minute and try again.' })
+    res.status(429).json({ error: 'That is a lot of questions at once. Please wait a minute and try again.', code: 'toomany' })
     return
   }
 
   let messages = Array.isArray(req.body?.messages) ? req.body.messages : null
   if (!messages || messages.length === 0) {
-    res.status(400).json({ error: 'messages array required' })
+    res.status(400).json({ error: 'messages array required', code: 'badrequest' })
     return
   }
   messages = messages
@@ -259,7 +264,7 @@ export default async function handler(req, res) {
     .slice(-MAX_TURNS)
     .map((m) => ({ role: m.role, content: m.content.slice(0, MAX_MSG_CHARS) }))
   if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
-    res.status(400).json({ error: 'last message must be from the user' })
+    res.status(400).json({ error: 'last message must be from the user', code: 'badrequest' })
     return
   }
 
@@ -359,5 +364,6 @@ export default async function handler(req, res) {
     error: allRateLimited
       ? 'RightsBook is busy right now. Please try again in a moment.'
       : 'Something went wrong answering that. Please try again.',
+    code: allRateLimited ? 'busy' : 'failed',
   })
 }

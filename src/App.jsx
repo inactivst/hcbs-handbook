@@ -79,7 +79,13 @@ const C = {
   surface: '#FFFFFF',
   ink: '#2B2A28',
   sub: '#6E6A64',
-  ink3: '#8A857D',
+  // Was #8A857D, which measured 3.3:1 on the page background - a fail at the
+  // 11-13px sizes it is used at, and it carries the citations and the "sources last
+  // reviewed" date, the two things a reader has to be able to check. #726D66 is
+  // 4.63:1 on bg and 5.13:1 on white. It sits very close to `sub` on purpose: a
+  // third grey tier cannot be both lighter and legible at this size, so the
+  // hierarchy is carried by size and weight instead of colour.
+  ink3: '#726D66',
   line: '#E5E2DC',
   lineHard: '#D9D5CE',
   border: 'rgba(43,42,40,0.14)',
@@ -102,6 +108,32 @@ const STARTER_KEYS = ['starter1', 'starter2', 'starter3', 'starter4', 'starter5'
 
 // Tallest the composer grows before it starts scrolling internally (~5 lines).
 const COMPOSER_MAX = 120
+
+// Hard ceiling on one chat request. The server already races providers and gives
+// up on its own; this is the client's own floor under that, for the case where the
+// function never answers at all.
+const CHAT_TIMEOUT_MS = 45000
+
+// Which translated sentence a failed chat request earns. Server failures carry a
+// stable `code` (api/chat.js); everything else is inferred here. The point is that
+// nothing raw ever reaches the screen: not "Failed to fetch", not an English server
+// string in a Spanish UI, not "no model provider key set".
+function chatErrorKey(e) {
+  if (e?.name === 'TimeoutError') return 'errTimeout'
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return 'errOffline'
+  switch (e?.code) {
+    case 'toomany': return 'errTooMany'
+    case 'busy': return 'errBusy'
+    case 'noprovider': return 'errNoProvider'
+    case 'failed': return 'errGeneric'
+    default: break
+  }
+  // fetch() rejects with a TypeError for DNS, refused connections and dropped
+  // links - all of which read to a person as "the internet is not working".
+  if (e instanceof TypeError) return 'errOffline'
+  if (e?.status === 429) return 'errBusy'
+  return 'errGeneric'
+}
 
 // Off-screen but still read aloud. For status text that a sighted reader gets from
 // the answer simply appearing, and a screen-reader user would otherwise never hear.
@@ -297,6 +329,9 @@ const inputStyle = {
   background: C.surface,
   border: `1px solid ${C.border}`,
   borderRadius: 12, padding: '11px 13px',
+  // 43px at the default padding - a pixel under the touch floor. Set the floor
+  // here rather than at each call site so every field in the app clears it.
+  minHeight: 44,
   fontSize: 16, color: C.ink, outline: 'none',
   fontFamily: 'inherit',
   boxShadow: 'inset 0 1px 2px rgba(43,42,40,0.05)',
@@ -1167,6 +1202,14 @@ function AppInner() {
 
   const activeMessages = (activeId ? conversations.find((c) => c.id === activeId)?.messages : null) || []
 
+  // A chat request that never settles used to leave "Looking that up…" on screen
+  // forever with no way out. Time-box it and give the abort a handle the UI can
+  // pull, so waiting is always the reader's choice.
+  const chatAbortRef = useRef(null)
+  function cancelSend() {
+    chatAbortRef.current?.abort(new DOMException('canceled', 'AbortError'))
+  }
+
   async function send(text) {
     const q = (text || '').trim()
     if (!q || busy) return false
@@ -1184,10 +1227,14 @@ function AppInner() {
       setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: next } : c)))
     }
     setBusy(true)
+    const ctrl = new AbortController()
+    chatAbortRef.current = ctrl
+    const timer = setTimeout(() => ctrl.abort(new DOMException('timeout', 'TimeoutError')), CHAT_TIMEOUT_MS)
     try {
       const r = await fetch(`${API_ORIGIN}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: ctrl.signal,
         body: JSON.stringify({
           state: stateCode || 'CA',
           lang,
@@ -1195,18 +1242,22 @@ function AppInner() {
         }),
       })
       const data = await r.json().catch(() => ({}))
-      if (!r.ok) throw new Error(data.error || tr('errGeneric'))
+      if (!r.ok) throw Object.assign(new Error(data.error || 'request failed'), { code: data.code, status: r.status })
       const withAnswer = [...next, { role: 'assistant', content: data.reply, sources: data.sources || [] }]
       setConversations((prev) => prev.map((c) => (c.id === convId ? { ...c, messages: withAnswer } : c)))
       return true
     } catch (e) {
-      setError(e.message || tr('errGeneric'))
+      // A cancel is the reader's own decision, not a failure - restore the composer
+      // silently rather than accusing them of an error they caused on purpose.
+      setError(e?.name === 'AbortError' ? '' : tr(chatErrorKey(e)))
       setConversations((prev) =>
         prev.map((c) => (c.id === convId ? { ...c, messages: base } : c)).filter((c) => c.messages.length > 0)
       )
       if (base.length === 0) setActiveId(null)
       return false
     } finally {
+      clearTimeout(timer)
+      chatAbortRef.current = null
       setBusy(false)
     }
   }
@@ -1297,7 +1348,7 @@ function AppInner() {
           connected={cloud.status === 'ready'}
           showDisclaimer={tab === 'chat'}
         />
-        {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
+        {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onCancel={cancelSend} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} onSaveIncident={cloud.status === 'ready' ? incidents.save : undefined} />}
         {tab === 'vault' && (
           <VaultPage
@@ -1352,7 +1403,11 @@ function IconBtn({ label, onClick, children }) {
       aria-label={label}
       title={label}
       style={{
-        width: 38, height: 38, borderRadius: 12,
+        // 44x44 is the floor for a comfortable touch target, and this app is used
+        // by people with motor disabilities. Max three of these ever render at once
+        // (History and Glossary are mutually exclusive), so the wordmark still fits
+        // beside them at 320px.
+        width: 44, height: 44, borderRadius: 12,
         background: C.surface, border: `1px solid ${C.border}`,
         color: C.sub, cursor: 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1417,6 +1472,10 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
   const pill = (label, active, onClick) => (
     <button onClick={onClick} aria-current={active ? 'page' : undefined} style={{
       border: 'none', background: active ? C.accent : 'transparent', color: active ? '#fff' : C.sub,
+      // Height is the 44px touch floor, not the label's own 37px. These two are the
+      // free, mission-core destinations; they were the smallest targets on screen
+      // while the paid Vault button next to them was 60px.
+      minHeight: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       borderRadius: 999, padding: '10px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
       // Shrink + ellipsis is the last resort only. The padding above is trimmed
       // enough that the longest shipped labels stay whole down to a 320px screen.
@@ -1474,7 +1533,7 @@ function StateBar({ stateCode, onStateChange }) {
           onChange={onStateChange}
           options={STATE_OPTIONS}
           ariaLabel={t('state')}
-          style={{ padding: '7px 11px', borderRadius: 999, fontSize: 14 }}
+          style={{ padding: '11px', borderRadius: 999, fontSize: 14, minHeight: 44 }}
         />
       </div>
       {!stateCovered(stateCode) && (
@@ -1484,7 +1543,7 @@ function StateBar({ stateCode, onStateChange }) {
   )
 }
 
-function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onStateChange, onCompare }) {
+function Chat({ messages, activeId, busy, error, onSend, onCancel, onNew, stateCode, onStateChange, onCompare }) {
   const t = useT()
   const [input, setInput] = useState('')
   // While READING an answer (conversation open, field idle and empty) the
@@ -1571,7 +1630,7 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
                 <div style={{ fontSize: 14, color: C.sub, marginBottom: 10 }}>{t('tryAsking')}</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                   {STARTER_KEYS.map((k) => (
-                    <button key={k} onClick={() => submit(t(k))} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.ink, borderRadius: 12, padding: '10px 13px', fontSize: 14, cursor: 'pointer', textAlign: 'left', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
+                    <button key={k} onClick={() => submit(t(k))} style={{ border: `1px solid ${C.border}`, background: C.card, color: C.ink, borderRadius: 12, padding: '10px 13px', minHeight: 44, display: 'inline-flex', alignItems: 'center', fontSize: 14, cursor: 'pointer', textAlign: 'left', boxShadow: '0 1px 2px rgba(43,42,40,0.04)' }}>
                       {t(k)}
                     </button>
                   ))}
@@ -1603,8 +1662,21 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
             {/* The one spoken channel for the Ask flow: "looking up", the error, and
                 - invisibly - the fact that an answer landed. Without this a screen
                 reader user gets total silence between sending and reading. */}
-            <div role="status" aria-live="polite" aria-atomic="true" style={{ minHeight: 26, padding: '2px 4px' }}>
+            <div role="status" aria-live="polite" aria-atomic="true" style={{ minHeight: 26, padding: '2px 4px', display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
               {busy && <span style={{ fontSize: 13, color: C.sub }}>{t('lookingUp')}</span>}
+              {/* Waiting has to be escapable. The request is time-boxed at 45s, but
+                  45s of a frozen screen is its own kind of broken. */}
+              {busy && onCancel && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  style={{
+                    background: 'none', border: 'none', padding: '4px 2px', margin: 0,
+                    color: C.accent, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    textDecoration: 'underline', fontFamily: 'inherit',
+                  }}
+                >{t('cancel')}</button>
+              )}
               {!busy && error && <span style={{ fontSize: 13, color: C.danger }}>{error}</span>}
               {!busy && !error && justAnswered && <span style={SR_ONLY}>{t('ansReady')}</span>}
             </div>
@@ -1638,7 +1710,17 @@ function Chat({ messages, activeId, busy, error, onSend, onNew, stateCode, onSta
             <button
               type="submit"
               disabled={busy || !input.trim()}
-              style={{ background: busy || !input.trim() ? C.line : C.accent, color: '#fff', border: 'none', borderRadius: 14, padding: '13px 18px', fontSize: 15, fontWeight: 700, cursor: busy || !input.trim() ? 'default' : 'pointer', marginBottom: 4 }}
+              // Filled-grey-with-white-text measured 1.29:1 - the app's primary
+              // action was unreadable in its resting state. An unfilled button with
+              // body-grey text reads as "not yet" and still passes on the composer
+              // background. The 1px border is on both states so nothing shifts.
+              style={{
+                background: busy || !input.trim() ? 'transparent' : C.accent,
+                color: busy || !input.trim() ? C.sub : '#fff',
+                border: `1px solid ${busy || !input.trim() ? C.lineHard : C.accent}`,
+                borderRadius: 14, padding: '13px 18px', fontSize: 15, fontWeight: 700,
+                cursor: busy || !input.trim() ? 'default' : 'pointer', marginBottom: 4,
+              }}
             >
               {t('ask')}
             </button>
@@ -4309,6 +4391,8 @@ const LOCK_OPTIONS = [
 const cloudBtn = (kind = 'primary') => ({
   width: '100%', boxSizing: 'border-box', border: 'none', cursor: 'pointer',
   borderRadius: 12, padding: '13px 16px', fontSize: 15, fontWeight: 700,
+  // 43.5px on its own padding; half a pixel under the touch floor is still under.
+  minHeight: 44,
   fontFamily: 'inherit',
   ...(kind === 'primary'
     ? { background: C.accent, color: '#fff' }
