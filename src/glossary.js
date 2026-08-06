@@ -64,7 +64,7 @@ export const STATE_TERMS = {
     { term: 'FMS', full: 'Financial Management Service', def: 'In the Self-Determination Program, the entity that handles the money - paying your providers out of your budget.' },
     { term: 'WIC', full: 'Welfare and Institutions Code', def: 'The California code where the Lanterman Act lives. Citations like "WIC 4731" point to sections of it.' },
     { term: '4731 complaint', def: 'A complaint under WIC section 4731 that a regional center or provider violated your rights - filed with the regional center director. The Vault’s complaint packet builds one.' },
-    { term: 'Service code', def: 'The number regional centers use for each service type in their billing system (like 510 for supported living). The Rights tab has the California list.' },
+    { term: 'Service code', def: 'The number regional centers use for each service type in their billing system (896 is supported living, 864 an in-home respite worker). The Rights tab has all 183 California codes, searchable.' },
   ],
   TX: [
     { term: 'LIDDA', full: 'Local Intellectual and Developmental Disability Authority', def: 'Your local entry point for I/DD services in Texas - handles intake, eligibility, the waiver interest lists, and service coordination.' },

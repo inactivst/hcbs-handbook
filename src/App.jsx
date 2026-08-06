@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { FEDERAL, STATES, US_STATES } from '../api/_corpus.js'
+import { FEDERAL, STATES, US_STATES, SERVICE_CODE_GROUPS, SERVICE_CODES_SOURCE } from '../api/_corpus.js'
 import { useCloud, mergeConversations } from './cloud.js'
 import { LANG_OPTIONS, LangContext, getStoredLang, storeLang, useT, tr } from './i18n.js'
 import { CENTERS, COUNTY_TO_RC, LA_CENTERS, COUNTIES, siblingCounties, CA_MAP, DDS_LOOKUP_URL } from './regionalCenters.js'
@@ -392,6 +392,58 @@ const inputStyle = {
   transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
 }
 
+// A field the reader can look at but not change. The Vault's cleaner view locks
+// its forms two different ways - `readOnly` on the text fields, `disabled` on the
+// date fields, because readOnly does nothing to a date picker - and with only one
+// style between them the same locked form showed some fields as white-and-live
+// and others as greyed-out. One recipe, so a locked field looks locked wherever
+// it is and whichever attribute did the locking.
+const lockedFieldStyle = { background: C.bg, color: C.sub, boxShadow: 'none', opacity: 1, WebkitTextFillColor: C.sub }
+const fieldStyle = (locked) => (locked ? { ...inputStyle, ...lockedFieldStyle } : inputStyle)
+
+// ─── SEARCH FIELD ─────────────────────────────────────────────────────────────
+// Four screens search a list (glossary, service codes, other states, compare) and
+// each had grown its own bare <input>: no search keyboard, no "search" return key,
+// and autocapitalise turning "respite" into "Respite" on the way in. The clear
+// button matters more than it looks: inputStyle sets -webkit-appearance:none for
+// an unrelated iOS sizing bug, and that also removes the native × from a
+// type=search field, so without this there is no way to empty the box but
+// backspace. Clearing returns focus to the field, since the reason you cleared it
+// is that you want to type something else.
+function SearchField({ value, onChange, placeholder, style, autoFocus = false }) {
+  const t = useT()
+  const ref = useRef(null)
+  return (
+    <div style={{ position: 'relative', ...style }}>
+      <input
+        ref={ref}
+        type="search" inputMode="search" enterKeyHint="search"
+        autoCapitalize="none" autoCorrect="off" spellCheck={false} autoComplete="off"
+        autoFocus={autoFocus}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape' && value) { e.stopPropagation(); onChange('') } }}
+        placeholder={placeholder} aria-label={placeholder}
+        style={{ ...inputStyle, paddingRight: value ? 42 : 13 }}
+      />
+      {value && (
+        <button
+          type="button"
+          onClick={() => { onChange(''); ref.current?.focus() }}
+          aria-label={t('clearSearch')}
+          style={{
+            position: 'absolute', top: 0, right: 0, height: '100%', width: 42,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: C.ink3,
+          }}
+        >
+          <IcX size={16} />
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ─── SMALL HOOKS ──────────────────────────────────────────────────────────────
 function useEscToClose(onClose, active = true) {
   useEffect(() => {
@@ -547,11 +599,29 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', styl
   const [open, setOpen] = useState(false)
   const btnRef = useRef(null)
   const menuRef = useRef(null)
+  const optRefs = useRef([])
+  const listId = useRef(`sel-${genId()}`).current
   const [rect, setRect] = useState(null)
   const opts = options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o))
   const sel = opts.find((o) => o.value === value)
-  const close = useCallback(() => setOpen(false), [])
+  // Closing hands focus back to the trigger. Without it a keyboard user who
+  // presses Escape is returned to the top of the document, which on a long
+  // settings sheet means losing their place entirely.
+  const close = useCallback(() => { setOpen(false); btnRef.current?.focus() }, [])
   useEscToClose(close, open)
+  // Arrow keys inside the menu, and Home/End to jump. The options are real
+  // buttons, so Enter and Space already select without any handler here.
+  const onMenuKey = (e) => {
+    const els = optRefs.current.filter(Boolean)
+    if (!els.length) return
+    const i = els.indexOf(document.activeElement)
+    const go = (n) => { e.preventDefault(); els[Math.max(0, Math.min(els.length - 1, n))]?.focus() }
+    if (e.key === 'ArrowDown') go(i < 0 ? 0 : i + 1)
+    else if (e.key === 'ArrowUp') go(i < 0 ? els.length - 1 : i - 1)
+    else if (e.key === 'Home') go(0)
+    else if (e.key === 'End') go(els.length - 1)
+    else if (e.key === 'Tab') { e.preventDefault(); close() }
+  }
   const measure = () => { const b = btnRef.current; if (b) setRect(b.getBoundingClientRect()) }
   // If a field is focused, dismiss the keyboard and let layout settle BEFORE
   // measuring, or the menu anchors to a stale position.
@@ -585,6 +655,10 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', styl
       el.style.opacity = '0'; el.style.transform = 'translateY(-6px)'
       requestAnimationFrame(() => { el.style.transition = 'opacity 0.14s ease, transform 0.14s ease'; el.style.opacity = '1'; el.style.transform = 'translateY(0)' })
     }
+    // Land on the current choice, so the list opens where the reader already is.
+    const i = Math.max(0, opts.findIndex((o) => o.value === value))
+    optRefs.current[i]?.focus({ preventScroll: true })
+    optRefs.current[i]?.scrollIntoView({ block: 'nearest' })
     return () => { window.removeEventListener('resize', on); window.removeEventListener('scroll', on, true); window.visualViewport?.removeEventListener('resize', on) }
   }, [open])
 
@@ -601,7 +675,9 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', styl
       <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 4000 }}>
         <div
           ref={menuRef}
+          id={listId} role="listbox" aria-label={ariaLabel}
           onClick={(e) => e.stopPropagation()}
+          onKeyDown={onMenuKey}
           style={{
             position: 'fixed', left, width, ...vpos, maxHeight: maxH, overflowY: 'auto', overscrollBehavior: 'contain',
             background: C.surface, borderRadius: 12, border: `1px solid ${C.line}`,
@@ -613,6 +689,8 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', styl
             return (
               <button
                 key={o.value} type="button"
+                ref={(el) => { optRefs.current[i] = el }}
+                role="option" aria-selected={on}
                 onClick={() => { onChange(o.value); close() }}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left',
@@ -638,7 +716,9 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', styl
       <button
         ref={btnRef}
         type="button" disabled={disabled} aria-label={ariaLabel}
+        role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={open ? listId : undefined}
         onClick={openMenu}
+        onKeyDown={(e) => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); openMenu() } }}
         style={{
           ...inputStyle, cursor: disabled ? 'not-allowed' : 'pointer', textAlign: 'left',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
@@ -666,6 +746,11 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', styl
 // viewport (touch) so the bottom-anchored sheet sits right above the keyboard.
 function Modal({ onClose, children, title, width = 480 }) {
   useEscToClose(onClose)
+  // Every sheet in this app was an unlabelled <div>: no dialog role, no name, and
+  // nothing telling assistive tech that the page behind it is inert. One id here
+  // names the sheet by its own visible title, so a screen reader announces which
+  // sheet just opened instead of reading the page underneath it.
+  const titleId = useRef(`sheet-${genId()}`).current
   const sheetRef = useRef(null)
   const innerRef = useRef(null)
   const drag = useRef({ active: false, started: false, startY: 0, cur: 0 })
@@ -820,6 +905,7 @@ function Modal({ onClose, children, title, width = 480 }) {
     >
       <div
         ref={sheetRef}
+        role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%', maxWidth: width, margin: '0 auto',
@@ -837,7 +923,7 @@ function Modal({ onClose, children, title, width = 480 }) {
         {IS_TOUCH && <div style={{ width: 40, height: 4, borderRadius: 2, background: C.lineHard, margin: '0 auto 14px', flexShrink: 0 }} />}
         {title && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, flexShrink: 0, paddingLeft: 20, paddingRight: 20 }}>
-            <span style={{ fontFamily: serif, fontSize: 21, fontWeight: 700, color: C.ink }}>{title}</span>
+            <h2 id={titleId} style={{ fontFamily: serif, fontSize: 21, fontWeight: 700, color: C.ink, margin: 0 }}>{title}</h2>
             {!IS_TOUCH && (
               <button onClick={onClose} aria-label="Close" title="Close (Esc)" style={{ background: 'none', border: 'none', color: C.ink3, cursor: 'pointer', padding: 4, display: 'flex' }}>
                 <IcX size={20} />
@@ -1402,6 +1488,11 @@ function AppInner() {
           connected={cloud.status === 'ready'}
           showDisclaimer={tab === 'chat'}
         />
+        {/* One <main> around whichever tab is showing, so "skip to content" and
+            the landmark rotor both have somewhere to land. The flex sizing was on
+            each page's own root before; keeping it here means the pages did not
+            have to change. */}
+        <main aria-label={tr('mainLandmark')} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         {tab === 'chat' && <Chat messages={activeMessages} activeId={activeId} busy={busy} error={error} onSend={send} onCancel={cancelSend} onNew={startNew} stateCode={stateCode || 'CA'} onStateChange={chooseState} onCompare={compareAnswer} />}
         {tab === 'library' && <Library stateCode={stateCode || 'CA'} onStateChange={chooseState} onSaveIncident={cloud.status === 'ready' ? incidents.save : undefined} />}
         {tab === 'vault' && (
@@ -1419,6 +1510,7 @@ function AppInner() {
             isCA={(stateCode || 'CA') === 'CA'}
           />
         )}
+        </main>
       </div>
       {/* Bottom fade: content dissolves into the background before it reaches the
           floating nav, so cards never blend into the glass pill. */}
@@ -1476,7 +1568,7 @@ function IconBtn({ label, onClick, children }) {
 function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDisclaimer }) {
   const t = useT()
   return (
-    <div style={{ flexShrink: 0 }}>
+    <header style={{ flexShrink: 0 }}>
       {/* Slim app-chrome bar: a small wordmark + actions, closed off by a hairline
           so it reads as chrome. Each page's own serif title is the only big
           headline below it - the wordmark never competes with page titles. */}
@@ -1505,14 +1597,19 @@ function Header({ onSettings, onCloud, onHistory, onGlossary, connected, showDis
           <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.5, margin: '0 2px' }}>{t('tagline')}</div>
         </div>
       )}
-    </div>
+    </header>
   )
 }
 
 // The one big headline on every page - pages own the hierarchy, the chrome
 // bar above stays small. Shared so Vault / Rights / future tabs never drift.
 function PageTitle({ children }) {
-  return <div style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: -0.3, color: C.ink, margin: '14px 2px 6px' }}>{children}</div>
+  // A real <h1>, not a styled div. Every title in this app used to be a div, which
+  // left a screen reader with no headings and no way to jump - in an app whose
+  // readers disproportionately use one. Size, weight and margin are all set
+  // explicitly here, so the browser's own h1 defaults never show through and the
+  // rendered result is identical to the div it replaces.
+  return <h1 style={{ fontFamily: serif, fontSize: 26, fontWeight: 700, letterSpacing: -0.3, color: C.ink, margin: '14px 2px 6px' }}>{children}</h1>
 }
 
 // Bottom nav: Ask (left) · raised Vault button (center, opens the vault sheet) ·
@@ -1537,7 +1634,7 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
     }}>{label}</button>
   )
   return (
-    <div style={{ position: 'fixed', left: 0, right: 0, bottom: 'max(env(safe-area-inset-bottom), 12px)', display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
+    <nav aria-label={t('navLandmark')} style={{ position: 'fixed', left: 0, right: 0, bottom: 'max(env(safe-area-inset-bottom), 12px)', display: 'flex', justifyContent: 'center', pointerEvents: 'none', zIndex: 50 }}>
       <div
         style={{
           pointerEvents: 'auto',
@@ -1568,7 +1665,7 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
         </button>
         {pill(t('navRights'), tab === 'library', onLibrary)}
       </div>
-    </div>
+    </nav>
   )
 }
 
@@ -2137,13 +2234,7 @@ function GlossarySheet({ onClose, stateCode }) {
   return (
     <Modal onClose={onClose} title={t('glossary')}>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('glossarySub')}</div>
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder={t('glossarySearch')}
-        aria-label={t('glossarySearch')}
-        style={inputStyle}
-      />
+      <SearchField value={q} onChange={setQ} placeholder={t('glossarySearch')} />
       {stateHits.length > 0 && (
         <>
           {sectionHead(t('glossaryStateSection', { name: stateName(stateCode) }))}
@@ -2219,23 +2310,58 @@ const IcHeart = ({ size = 24, style }) => (
   </SvgIcon>
 )
 
-function ServiceCodeList({ codes }) {
+// One service-code row. The number is the thing a reader arrives with - it is on
+// their IPP, their invoice, the notice they were handed - so it gets its own
+// fixed-width column and every name starts at the same x. A code that has been
+// retired or needs an exemption still belongs on the list (an older plan is
+// exactly where you meet one), but it says so on the row rather than reading as
+// something you could ask for today.
+const CODE_STATUS_KEY = { retired: 'rtCodesRetired', exemption: 'rtCodesExemption' }
+
+function ServiceCodeRow({ s, first, showGroup }) {
+  const t = useT()
+  const statusKey = CODE_STATUS_KEY[s.status]
+  return (
+    <div style={{ display: 'flex', gap: 12, padding: '11px 0', borderTop: first ? 'none' : `1px solid ${C.line}` }}>
+      <span style={{
+        flexShrink: 0, width: 40, textAlign: 'right', fontSize: 15, fontWeight: 700, lineHeight: 1.35,
+        color: C.accent, fontVariantNumeric: 'tabular-nums', letterSpacing: 0.2,
+      }}>{s.code}</span>
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 15, fontWeight: 600, color: C.ink, lineHeight: 1.35 }}>{s.name}</span>
+        <span style={{ display: 'block', fontSize: 13, color: C.sub, marginTop: 3, lineHeight: 1.5 }}>{s.note}</span>
+        {/* Footer metadata, below the sentence it qualifies. Putting the category
+            between the name and the note read as a subtitle of the service and
+            broke the one line a reader actually came for. */}
+        {(statusKey || (showGroup && s.groupLabel)) && (
+          <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+            {statusKey && (
+              <span style={{
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.3, textTransform: 'uppercase',
+                color: C.ink3, background: C.bg, border: `1px solid ${C.line}`,
+                borderRadius: R.pill, padding: '2px 8px',
+              }}>{t(statusKey)}</span>
+            )}
+            {showGroup && s.groupLabel && (
+              <span style={{ fontSize: 11.5, color: C.ink3 }}>{s.groupLabel}</span>
+            )}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+function ServiceCodeList({ codes, showGroup = false }) {
   return (
     <div style={{ ...cardStyle(), padding: '6px 14px' }}>
-      {codes.map((s, i) => (
-        <div key={s.code} style={{ padding: '11px 0', borderTop: i === 0 ? 'none' : `1px solid ${C.line}` }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>
-            <span style={{ color: C.accent, fontVariantNumeric: 'tabular-nums' }}>{s.code}</span>  {s.name}
-          </div>
-          <div style={{ fontSize: 13, color: C.sub, marginTop: 3, lineHeight: 1.5 }}>{s.note}</div>
-        </div>
-      ))}
+      {codes.map((s, i) => <ServiceCodeRow key={s.code} s={s} first={i === 0} showGroup={showGroup} />)}
     </div>
   )
 }
 
 function SectionTitle({ children, first = false }) {
-  return <div style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: `${first ? 4 : 22}px 0 10px` }}>{children}</div>
+  return <h2 style={{ fontFamily: serif, fontSize: 19, fontWeight: 700, margin: `${first ? 4 : 22}px 0 10px` }}>{children}</h2>
 }
 
 // ─── Rights: topic grouping ───────────────────────────────────────────────────
@@ -2401,14 +2527,64 @@ function StateSheet({ code, onClose }) {
     </Modal>
   )
 }
+// The service-code sheet. It carries all 183 California codes now, which is only
+// useful if the one you are holding is findable in a few seconds: the search
+// matches the number, the official name and the plain-language note, and an
+// exact three-digit match is pinned to the top because typing "864" means you
+// are looking at 864 on a piece of paper, not browsing.
+function codeMatches(s, q) {
+  return s.code.includes(q) || s.name.toLowerCase().includes(q) || (s.note || '').toLowerCase().includes(q)
+}
+
 function CodesSheet({ code, onClose }) {
   const t = useT()
   const pack = STATES[code]
+  const [q, setQ] = useState('')
+  const query = q.trim().toLowerCase()
+  const isCA = code === 'CA'
+  const all = pack.serviceCodes
+  // California is the only pack with the grouped listing; any future state pack
+  // that ships a flat array still renders, just without section headings.
+  const groups = isCA ? SERVICE_CODE_GROUPS : null
+
+  const hits = query ? all.filter((s) => codeMatches(s, query)) : null
+  if (hits) {
+    hits.sort((a, b) => (b.code === query) - (a.code === query) || a.code.localeCompare(b.code))
+  }
+
   return (
     <Modal onClose={onClose} title={t('rtCodesTitle')}>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('rtCodesIntro')}</div>
-      <ServiceCodeList codes={pack.serviceCodes} />
-      {code === 'CA' && <div style={{ fontSize: 12, color: C.sub, marginTop: 10, lineHeight: 1.5 }}>{t('caFootnote')}</div>}
+
+      <SearchField value={q} onChange={setQ} placeholder={t('rtCodesSearchPh')} />
+      <div aria-live="polite" style={{ fontSize: 12, color: C.ink3, margin: '8px 2px 12px' }}>
+        {query ? t('rtCodesHits', { n: hits.length }) : t('rtCodesTotal', { n: all.length })}
+      </div>
+
+      {query
+        ? (hits.length
+          ? <ServiceCodeList codes={hits} showGroup />
+          : (
+            <div style={{ ...cardStyle(), padding: '18px 16px', fontSize: 14, color: C.sub, lineHeight: 1.55 }}>
+              {t('rtCodesNone')}
+            </div>
+          ))
+        : (groups
+          ? groups.map((g, i) => (
+            <div key={g.id}>
+              <div style={{ ...sectionLabel, margin: `${i === 0 ? 2 : 20}px 2px 8px` }}>{g.label}</div>
+              <ServiceCodeList codes={g.codes} />
+            </div>
+          ))
+          : <ServiceCodeList codes={all} />)}
+
+      {isCA && (
+        <div style={{ fontSize: 12, color: C.sub, marginTop: 14, lineHeight: 1.5 }}>
+          {t('rtCodesSource', { date: 'January 2026' })}{' '}
+          <a href={SERVICE_CODES_SOURCE.url} target="_blank" rel="noreferrer" style={{ color: C.accent, fontWeight: 600 }}>dds.ca.gov</a>
+          <div style={{ marginTop: 6 }}>{t('caFootnote')}</div>
+        </div>
+      )}
     </Modal>
   )
 }
@@ -2445,11 +2621,7 @@ function CompareStates({ currentCode, onOpen }) {
         options={COMPARE_TOPICS.map((o) => ({ value: o.id, label: t(`csTopic${o.id.charAt(0).toUpperCase()}${o.id.slice(1)}`) }))}
         ariaLabel={t('csTabCompare')}
       />
-      <input
-        value={q} onChange={(e) => setQ(e.target.value)}
-        placeholder={t('csSearchPh')} aria-label={t('csSearchPh')}
-        style={{ ...inputStyle, marginTop: 10, marginBottom: 14 }}
-      />
+      <SearchField value={q} onChange={setQ} placeholder={t('csSearchPh')} style={{ marginTop: 10, marginBottom: 14 }} />
 
       {idle && <div style={{ fontSize: 14, color: C.sub, lineHeight: 1.55, margin: '18px 2px' }}>{t('csStart')}</div>}
 
@@ -2547,7 +2719,7 @@ function OtherStatesSheet({ currentCode, onClose }) {
       {mode === 'compare' ? <CompareStates currentCode={currentCode} onOpen={setSel} /> : (
       <>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('rtOthersIntro')}</div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t('rtSearchStates')} aria-label={t('rtSearchStates')} style={{ ...inputStyle, marginBottom: 12 }} />
+      <SearchField value={q} onChange={setQ} placeholder={t('rtSearchStates')} style={{ marginBottom: 12 }} />
       {list.map((o) => (
         <button key={o.value} onClick={() => setSel(o.value)} style={{ ...cardBtnStyle(), display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '13px 14px', marginBottom: 8 }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: C.ink }}>{o.label}</span>
@@ -2661,7 +2833,7 @@ function Library({ stateCode, onStateChange, onSaveIncident }) {
           the rest of this tab); the Vault stays purely login-gated records.
           Every state has at least the help tile, so the grid always renders. */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 6 }}>
-        {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { name })} onClick={() => setView('codes')} />}
+        {hasCodes && <VaultTile icon={<IcHash size={22} />} label={t('rtTileCodes')} sub={t('rtTileCodesSub', { n: pack.serviceCodes.length })} onClick={() => setView('codes')} />}
         {/* Regional centers are a California (Lanterman Act) construct - CA only. */}
         {stateCode === 'CA' && (
           <VaultTile icon={<IcMap size={22} />} label={t('rtTileRc')} sub={t('rtTileRcSub')} onClick={() => setView('rc')} />
@@ -3453,20 +3625,20 @@ function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud, readOnly })
   return (
     <>
       <label style={{ ...fieldLabel, marginTop: 0 }}>{t('incWhen')}</label>
-      <input type="date" value={at} onChange={(e) => setAt(e.target.value)} disabled={readOnly} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="date" value={at} onChange={(e) => setAt(e.target.value)} disabled={readOnly} max={todayISO()} style={fieldStyle(readOnly)} />
       <label style={fieldLabel}>{t('incWhat')}</label>
       <div>
         {/* Textarea wrapped in a block div (iOS flex-item collapse). */}
         <textarea
           value={what} onChange={(e) => setWhat(e.target.value)} rows={4} readOnly={readOnly}
-          placeholder={t('incWhatPh')}
-          style={{ ...inputStyle, fontSize: 16, resize: 'none', lineHeight: 1.5 }}
+          placeholder={t('incWhatPh')} autoCapitalize="sentences"
+          style={{ ...fieldStyle(readOnly), resize: 'none', lineHeight: 1.5 }}
         />
       </div>
       <label style={fieldLabel}>{t('incWhere')}</label>
-      <input type="text" value={where} onChange={(e) => setWhere(e.target.value)} readOnly={readOnly} placeholder={t('incWherePh')} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="text" value={where} onChange={(e) => setWhere(e.target.value)} readOnly={readOnly} placeholder={t('incWherePh')} autoCapitalize="sentences" style={fieldStyle(readOnly)} />
       <label style={fieldLabel}>{t('incWho')}</label>
-      <input type="text" value={who} onChange={(e) => setWho(e.target.value)} readOnly={readOnly} placeholder={t('incWhoPh')} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="text" value={who} onChange={(e) => setWho(e.target.value)} readOnly={readOnly} placeholder={t('incWhoPh')} autoCapitalize="words" style={fieldStyle(readOnly)} />
 
       <label style={fieldLabel}>{t('incPhotos')}</label>
       <input ref={photoInput} type="file" accept="image/*" multiple onChange={onPickPhoto} style={{ display: 'none' }} />
@@ -3540,16 +3712,16 @@ function DeadlineForm({ initial, onSave, onCancel, isCA, readOnly }) {
         </>
       )}
       <label style={isCA ? fieldLabel : { ...fieldLabel, marginTop: 0 }}>{t('dlNotice')}</label>
-      <input type="date" value={notice} onChange={(e) => setNotice(e.target.value)} disabled={readOnly} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="date" value={notice} onChange={(e) => setNotice(e.target.value)} disabled={readOnly} style={fieldStyle(readOnly)} />
       <label style={fieldLabel}>{t('dlLabel')}</label>
-      <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} readOnly={readOnly} placeholder={t('dlLabelPh')} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} readOnly={readOnly} placeholder={t('dlLabelPh')} autoCapitalize="sentences" style={fieldStyle(readOnly)} />
       {showDays && (
         <>
           <label style={fieldLabel}>{t('dlDays')}</label>
           <input
-            type="text" inputMode="numeric" value={days} maxLength={3} readOnly={readOnly}
+            type="text" inputMode="numeric" enterKeyHint="done" value={days} maxLength={3} readOnly={readOnly}
             onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))}
-            style={{ ...inputStyle, fontSize: 16 }}
+            style={fieldStyle(readOnly)}
           />
         </>
       )}
@@ -3824,12 +3996,12 @@ function LettersView() {
       <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.ink, marginBottom: 6 }}>{t(`lt_${picked}_title`)}</div>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 4 }}>{t(`lt_${picked}_body`).split('\n\n')[0]}</div>
       <label style={fieldLabel}>{t('ltName')}</label>
-      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('ltNamePlaceholder')} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('ltNamePlaceholder')} autoComplete="name" autoCapitalize="words" style={inputStyle} />
       <label style={fieldLabel}>{t('ltRecipient')}</label>
-      <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder={t('ltRecipientPlaceholder')} style={{ ...inputStyle, fontSize: 16 }} />
+      <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder={t('ltRecipientPlaceholder')} autoComplete="organization" autoCapitalize="words" style={inputStyle} />
       <label style={fieldLabel}>{t('ltDetails')}</label>
       <div>
-        <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} placeholder={t('ltDetailsPh')} style={{ ...inputStyle, fontSize: 16, resize: 'none', lineHeight: 1.5 }} />
+        <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} placeholder={t('ltDetailsPh')} autoCapitalize="sentences" style={{ ...inputStyle, resize: 'none', lineHeight: 1.5 }} />
       </div>
       <button onClick={make} style={{ ...cloudBtn('primary'), marginTop: 12 }}>{t('ltOpen')}</button>
       <CloudNote error={err} />

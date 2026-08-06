@@ -120,32 +120,11 @@ export const CHUNKS = [
   },
 ]
 
-// Verified against DDS-published documents: the Feb 2026 Service Code
-// Crosswalk (RateReform_ServiceCode_Crosswalk_20260205.pdf) and the DDS-posted
-// rate-study service code listing. Partial list - the full crosswalk lives at
-// dds.ca.gov. Sorted by code so the table scans like the official lists.
-export const SERVICE_CODES = [
-  { code: '055', name: 'Community Integration Training Program', note: 'A day service that teaches skills out in the community instead of in a center.' },
-  { code: '062', name: 'Personal Assistance', note: 'One-to-one assistance with daily activities, often in the home or community.' },
-  { code: '063', name: 'Community Activities Support Services', note: 'One-on-one or small group support to take part in community activities.' },
-  { code: '465', name: 'Participant-Directed Respite Services', note: 'Respite where the family picks and directs the respite worker themselves.' },
-  { code: '490', name: 'Financial Management Services (F/EA)', note: 'The fiscal agent that handles paychecks and taxes for participant-directed services; 491 is the co-employer version.' },
-  { code: '505', name: 'Activity Center (Adult Day Program)', note: 'Day program focused on daily living and social skills. Settings Rule community-access rights apply.' },
-  { code: '510', name: 'Adult Development Center (Adult Day Program)', note: 'Day program focused on developmental skill building. Settings Rule community-access rights apply.' },
-  { code: '520', name: 'Independent Living Program', note: 'Coaching to learn independent living skills like cooking, money, and getting around.' },
-  { code: '525', name: 'Social Recreation Program', note: 'Fun, social group activities; regional centers can fund social recreation again since July 2021.' },
-  { code: '531', name: 'Day Services', note: 'The new rate-reform day program code that programs like 505 and 510 are moving to; 532 is Behavioral Day Services and 533 is Medical Day Services.' },
-  { code: '612', name: 'Behavior Analyst', note: 'A certified behavior analyst who designs and oversees behavior support plans, including ABA-style services.' },
-  { code: '620', name: 'Behavior Management Consultant', note: 'A behavior specialist who consults on challenging behavior and trains the people who support the person.' },
-  { code: '805', name: 'Infant Development Program', note: 'Early Start services for babies and toddlers under 3, at home or in a center.' },
-  { code: '850', name: 'Camping Services', note: 'Camp and the travel to get there, restored as a fundable service in July 2021.' },
-  { code: '862', name: 'In-Home Respite Services Agency', note: 'Temporary relief care in the family home, provided through a vendored agency.' },
-  { code: '864', name: 'In-Home Respite Worker', note: 'Temporary relief care in the family home, provided by an individual worker.' },
-  { code: '868', name: 'Out-of-Home Respite Services', note: 'Temporary care outside the family home, e.g. at a licensed facility.' },
-  { code: '875', name: 'Transportation Company', note: 'Rides to and from day programs and other regional center services, provided by a vendored transportation company.' },
-  { code: '896', name: 'Supported Living Services', note: 'Help with daily living so an adult can live in their own home, with support built around them.' },
-  { code: '952', name: 'Supported Employment (Individual)', note: 'A job coach who helps someone get and keep a regular job in the community; 950 is the group version.' },
-]
+// The full California DDS service code list lives in its own module - all 183
+// codes from the department's own January 2026 listing. It is re-exported here
+// so every existing importer (the Rights UI, the chat retrieval) keeps working.
+export { SERVICE_CODES, SERVICE_CODE_GROUPS, SERVICE_CODES_SOURCE } from './_serviceCodes.js'
+import { SERVICE_CODES } from './_serviceCodes.js'
 
 // --- State-aware layer -----------------------------------------------------
 // HCBS is federal (42 CFR 441.301 applies in every state), but each state
