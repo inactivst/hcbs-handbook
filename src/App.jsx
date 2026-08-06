@@ -89,7 +89,11 @@ const C = {
   line: '#E5E2DC',
   lineHard: '#D9D5CE',
   border: 'rgba(43,42,40,0.14)',
-  accent: '#2E7D74',
+  // Was #2E7D74: 4.40:1 on bg — just under AA, and this token colours links,
+  // active states and the label on every filled button. #2A736B is 5.03:1 on bg
+  // and 5.58:1 for white sitting on it. Same hue, one step deeper. (The 2026-08-06
+  // family sweep: ink3 here was already fixed, the accent had not been checked.)
+  accent: '#2A736B',
   accentSoft: '#E4EEEC',
   danger: '#C0452C',
   dangerSoft: '#F7E4DF', // the "no" answer / blanket-rule flag tint
@@ -1657,8 +1661,8 @@ function Nav({ tab, onAsk, onLibrary, onVault }) {
           background: C.accent, color: '#fff',
           border: tab === 'vault' ? '3px solid #fff' : '3px solid rgba(255,255,255,0.9)', cursor: 'pointer',
           boxShadow: tab === 'vault'
-            ? `0 0 0 2px ${C.accent}, 0 6px 18px rgba(46,125,116,0.5)`
-            : '0 6px 18px rgba(46,125,116,0.4)',
+            ? `0 0 0 2px ${C.accent}, 0 6px 18px rgba(42,115,107,0.5)`
+            : '0 6px 18px rgba(42,115,107,0.4)',
         }}>
           <IcShield size={22} />
           <span style={{ fontSize: 10, fontWeight: 700 }}>{t('navVault')}</span>
@@ -4244,7 +4248,10 @@ function Paywall({ cloud, onNativePaid }) {
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 8 }}>
         <a href={PRIVACY_URL} target="_blank" rel="noopener noreferrer" style={payLegalLink}>{t('payPrivacy')}</a>
-        <span style={{ fontSize: 12, color: C.line }}>·</span>
+        {/* A separator drawn in the hairline token: C.line is a 10%-alpha border
+            colour, so the dot between the two legal links was effectively invisible
+            and they ran together. It is decoration, so it says so. */}
+        <span aria-hidden style={{ fontSize: 12, color: C.ink3 }}>·</span>
         <a href={APPLE_EULA_URL} target="_blank" rel="noopener noreferrer" style={payLegalLink}>{t('payTerms')}</a>
       </div>
 
