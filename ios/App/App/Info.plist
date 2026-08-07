@@ -22,6 +22,16 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<!-- Export compliance. Declaring NO means App Store Connect never shows the
+	     compliance questionnaire on upload, and a build never lands as "Missing
+	     Compliance". This app's encryption is AES-GCM over the user's own data at
+	     rest using standard platform algorithms, which is the exempt case; it is
+	     not a cryptographic product in its own right. Decided 2026-08-07, mirroring
+	     GuestBook and Critter Match, which have shipped approved this way.
+	     Re-evaluate if the app ever encrypts data for someone other than its own
+	     user, or ships a non-standard algorithm. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
