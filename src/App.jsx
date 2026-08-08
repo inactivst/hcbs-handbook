@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { FEDERAL, STATES, US_STATES, SERVICE_CODE_GROUPS, SERVICE_CODES_SOURCE } from '../api/_corpus.js'
 import { useCloud, mergeConversations } from './cloud.js'
@@ -676,7 +676,7 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', styl
     const maxH = Math.min(360, Math.max(140, (openUp ? spaceAbove : spaceBelow) - 12))
     const vpos = openUp ? { bottom: Math.max(8, vh - rect.top + 6) } : { top: rect.bottom + 6 }
     menu = createPortal(
-      <div onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 4000 }}>
+      <div role="presentation" onClick={close} style={{ position: 'fixed', inset: 0, zIndex: 4000 }}>
         <div
           ref={menuRef}
           id={listId} role="listbox" aria-label={ariaLabel}
@@ -886,6 +886,7 @@ function Modal({ onClose, children, title, width = 480 }) {
   // Portal to <body> so the sheet never nests inside another transformed subtree.
   return createPortal(
     <div
+      role="presentation"
       onClick={onClose}
       onTouchStart={(e) => e.stopPropagation()}
       onTouchMove={(e) => e.stopPropagation()}
@@ -907,6 +908,7 @@ function Modal({ onClose, children, title, width = 480 }) {
         padding: IS_TOUCH ? 0 : 24,
       }}
     >
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- the onClick is a GUARD against the backdrop's dismiss, not an action; this panel has a real dialog role, a close control and Escape */}
       <div
         ref={sheetRef}
         role="dialog" aria-modal="true" aria-labelledby={title ? titleId : undefined}
@@ -1043,6 +1045,7 @@ function SwipeableRow({ onTap, actions = [], radius = 14, marginBottom = 8, chil
           ))}
         </div>
       )}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- a gesture surface: the onClick only cancels an open swipe, which cannot exist without touch. The row's real controls are its children and the revealed action beside it. */}
       <div
         ref={cardRef}
         onClick={handleClick}
@@ -1856,6 +1859,9 @@ function Chat({ messages, activeId, busy, error, onSend, onCancel, onNew, stateC
               onFocus={() => setComposerFocus(true)}
               onBlur={() => setComposerFocus(false)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input) } }}
+              // A placeholder is not an accessible name — it disappears the moment you
+              // type. Same string, said in a way a screen reader keeps.
+              aria-label={t('composerPlaceholder')}
               placeholder={t('composerPlaceholder')}
               rows={1}
               style={{ ...inputStyle, resize: 'none', borderRadius: 14, padding: compact ? '7px 14px' : '12px 14px', lineHeight: 1.4, maxHeight: COMPOSER_MAX, transition: 'padding 0.15s ease' }}
@@ -3475,6 +3481,7 @@ function Lightbox({ photos, index = 0, cloud, onClose, onDelete }) {
   )
   return createPortal(
     <div
+      role="presentation"
       onClick={onClose}
       onTouchStart={(e) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
       onTouchEnd={(e) => {
@@ -3488,6 +3495,7 @@ function Lightbox({ photos, index = 0, cloud, onClose, onDelete }) {
         <IcX size={22} />
       </button>
       {loading && <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>{t('lbLoading')}</div>}
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/click-events-have-key-events -- stopPropagation only, so tapping the picture does not dismiss the viewer behind it */}
       {url && <img src={url} alt={doc?.name || ''} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />}
       {photos.length > 1 && navBtn('prev')}
       {photos.length > 1 && navBtn('next')}
@@ -3540,7 +3548,7 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded, readOnly })
     <>
       {!embedded && <SectionTitle>{t('docsTitle')}</SectionTitle>}
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 12 }}>{t('docsSub')}</div>
-      <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple onChange={onPick} style={{ display: 'none' }} />
+      <input ref={inputRef} type="file" accept="image/*,application/pdf" multiple onChange={onPick} style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
       {!readOnly && (
         <button disabled={busy} onClick={() => inputRef.current?.click()} style={{ ...cloudBtn('primary'), marginBottom: 8, opacity: busy ? 0.6 : 1 }}>
           {busy ? t('docUploading') : t('addDoc')}
@@ -3597,6 +3605,7 @@ function DocsSection({ cloud, docs, busy, onAdd, onRemove, embedded, readOnly })
 // after any change here. Photos are stored through the shared docs store, so they
 // also appear in the Documents gallery.
 function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud, readOnly }) {
+  const uid = useId()
   const t = useT()
   const [at, setAt] = useState(initial?.at || todayISO())
   const [what, setWhat] = useState(initial?.what || '')
@@ -3628,24 +3637,25 @@ function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud, readOnly })
 
   return (
     <>
-      <label style={{ ...fieldLabel, marginTop: 0 }}>{t('incWhen')}</label>
-      <input type="date" value={at} onChange={(e) => setAt(e.target.value)} disabled={readOnly} max={todayISO()} style={fieldStyle(readOnly)} />
-      <label style={fieldLabel}>{t('incWhat')}</label>
+      <label htmlFor={`${uid}-when`} style={{ ...fieldLabel, marginTop: 0 }}>{t('incWhen')}</label>
+      <input id={`${uid}-when`} type="date" value={at} onChange={(e) => setAt(e.target.value)} disabled={readOnly} max={todayISO()} style={fieldStyle(readOnly)} />
+      <label htmlFor={`${uid}-what`} style={fieldLabel}>{t('incWhat')}</label>
       <div>
         {/* Textarea wrapped in a block div (iOS flex-item collapse). */}
         <textarea
+          id={`${uid}-what`}
           value={what} onChange={(e) => setWhat(e.target.value)} rows={4} readOnly={readOnly}
           placeholder={t('incWhatPh')} autoCapitalize="sentences"
           style={{ ...fieldStyle(readOnly), resize: 'none', lineHeight: 1.5 }}
         />
       </div>
-      <label style={fieldLabel}>{t('incWhere')}</label>
-      <input type="text" value={where} onChange={(e) => setWhere(e.target.value)} readOnly={readOnly} placeholder={t('incWherePh')} autoCapitalize="sentences" style={fieldStyle(readOnly)} />
-      <label style={fieldLabel}>{t('incWho')}</label>
-      <input type="text" value={who} onChange={(e) => setWho(e.target.value)} readOnly={readOnly} placeholder={t('incWhoPh')} autoCapitalize="words" style={fieldStyle(readOnly)} />
+      <label htmlFor={`${uid}-where`} style={fieldLabel}>{t('incWhere')}</label>
+      <input id={`${uid}-where`} type="text" value={where} onChange={(e) => setWhere(e.target.value)} readOnly={readOnly} placeholder={t('incWherePh')} autoCapitalize="sentences" style={fieldStyle(readOnly)} />
+      <label htmlFor={`${uid}-who`} style={fieldLabel}>{t('incWho')}</label>
+      <input id={`${uid}-who`} type="text" value={who} onChange={(e) => setWho(e.target.value)} readOnly={readOnly} placeholder={t('incWhoPh')} autoCapitalize="words" style={fieldStyle(readOnly)} />
 
       <label style={fieldLabel}>{t('incPhotos')}</label>
-      <input ref={photoInput} type="file" accept="image/*" multiple onChange={onPickPhoto} style={{ display: 'none' }} />
+      <input ref={photoInput} type="file" accept="image/*" multiple onChange={onPickPhoto} style={{ display: 'none' }} tabIndex={-1} aria-hidden="true" />
       {photoDocs.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
           {photoDocs.map((doc, idx) => (
@@ -3691,6 +3701,7 @@ function IncidentForm({ initial, onSave, onCancel, vaultDocs, cloud, readOnly })
 // Denial-notice / deadline form (add/edit), nested inside the Deadlines sheet.
 // Same iOS keyboard caveat as IncidentForm - device-test fields above the fold.
 function DeadlineForm({ initial, onSave, onCancel, isCA, readOnly }) {
+  const uid = useId()
   const t = useT()
   const [notice, setNotice] = useState(initial?.notice || todayISO())
   // The 60/90-day tracks are California law - only offer them in CA. Everywhere
@@ -3715,14 +3726,15 @@ function DeadlineForm({ initial, onSave, onCancel, isCA, readOnly }) {
           <Select value={track} onChange={setTrack} options={trackOptions} ariaLabel={t('dlTrack')} />
         </>
       )}
-      <label style={isCA ? fieldLabel : { ...fieldLabel, marginTop: 0 }}>{t('dlNotice')}</label>
-      <input type="date" value={notice} onChange={(e) => setNotice(e.target.value)} disabled={readOnly} style={fieldStyle(readOnly)} />
-      <label style={fieldLabel}>{t('dlLabel')}</label>
-      <input type="text" value={label} onChange={(e) => setLabel(e.target.value)} readOnly={readOnly} placeholder={t('dlLabelPh')} autoCapitalize="sentences" style={fieldStyle(readOnly)} />
+      <label htmlFor={`${uid}-notice`} style={isCA ? fieldLabel : { ...fieldLabel, marginTop: 0 }}>{t('dlNotice')}</label>
+      <input id={`${uid}-notice`} type="date" value={notice} onChange={(e) => setNotice(e.target.value)} disabled={readOnly} style={fieldStyle(readOnly)} />
+      <label htmlFor={`${uid}-label`} style={fieldLabel}>{t('dlLabel')}</label>
+      <input id={`${uid}-label`} type="text" value={label} onChange={(e) => setLabel(e.target.value)} readOnly={readOnly} placeholder={t('dlLabelPh')} autoCapitalize="sentences" style={fieldStyle(readOnly)} />
       {showDays && (
         <>
-          <label style={fieldLabel}>{t('dlDays')}</label>
+          <label htmlFor={`${uid}-days`} style={fieldLabel}>{t('dlDays')}</label>
           <input
+            id={`${uid}-days`}
             type="text" inputMode="numeric" enterKeyHint="done" value={days} maxLength={3} readOnly={readOnly}
             onChange={(e) => setDays(e.target.value.replace(/\D/g, ''))}
             style={fieldStyle(readOnly)}
@@ -3967,6 +3979,7 @@ function HomeCheckSheet({ onClose, onSaveIncident }) {
 // steps form -> template list; the sheet is dismissed by swipe-down / tap-away.
 function LettersView() {
   const t = useT()
+  const uid = useId()
   const [picked, setPicked] = useState(null)
   const [name, setName] = useState('')
   const [recipient, setRecipient] = useState('')
@@ -3999,13 +4012,13 @@ function LettersView() {
     <>
       <div style={{ fontFamily: serif, fontSize: 18, fontWeight: 700, color: C.ink, marginBottom: 6 }}>{t(`lt_${picked}_title`)}</div>
       <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.55, marginBottom: 4 }}>{t(`lt_${picked}_body`).split('\n\n')[0]}</div>
-      <label style={fieldLabel}>{t('ltName')}</label>
-      <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('ltNamePlaceholder')} autoComplete="name" autoCapitalize="words" style={inputStyle} />
-      <label style={fieldLabel}>{t('ltRecipient')}</label>
-      <input type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder={t('ltRecipientPlaceholder')} autoComplete="organization" autoCapitalize="words" style={inputStyle} />
-      <label style={fieldLabel}>{t('ltDetails')}</label>
+      <label htmlFor={`${uid}-name`} style={fieldLabel}>{t('ltName')}</label>
+      <input id={`${uid}-name`} type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder={t('ltNamePlaceholder')} autoComplete="name" autoCapitalize="words" style={inputStyle} />
+      <label htmlFor={`${uid}-recipient`} style={fieldLabel}>{t('ltRecipient')}</label>
+      <input id={`${uid}-recipient`} type="text" value={recipient} onChange={(e) => setRecipient(e.target.value)} placeholder={t('ltRecipientPlaceholder')} autoComplete="organization" autoCapitalize="words" style={inputStyle} />
+      <label htmlFor={`${uid}-details`} style={fieldLabel}>{t('ltDetails')}</label>
       <div>
-        <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={3} placeholder={t('ltDetailsPh')} autoCapitalize="sentences" style={{ ...inputStyle, resize: 'none', lineHeight: 1.5 }} />
+        <textarea id={`${uid}-details`} value={details} onChange={(e) => setDetails(e.target.value)} rows={3} placeholder={t('ltDetailsPh')} autoCapitalize="sentences" style={{ ...inputStyle, resize: 'none', lineHeight: 1.5 }} />
       </div>
       <button onClick={make} style={{ ...cloudBtn('primary'), marginTop: 12 }}>{t('ltOpen')}</button>
       <CloudNote error={err} />
@@ -4663,6 +4676,7 @@ function PinEntry({ cloud }) {
   return (
     <>
       <input
+        aria-label={cta}
         type="password" inputMode="numeric" autoComplete="off" placeholder="••••" maxLength={4}
         value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
         onKeyDown={(e) => { if (e.key === 'Enter' && pin.length === 4) cloud.submitPin(pin) }}
@@ -4714,8 +4728,9 @@ function AuthFlow({ cloud, intro }) {
             <div style={{ fontSize: 13, color: C.sub, lineHeight: 1.6, marginBottom: 16 }}>{t('signInSub')}</div>
           </>
         )}
-        <label style={{ ...fieldLabelStyle, marginTop: 0 }}>{t('email')}</label>
+        <label htmlFor="cloud-email" style={{ ...fieldLabelStyle, marginTop: 0 }}>{t('email')}</label>
         <input
+          id="cloud-email"
           type="email" inputMode="email" autoComplete="email" placeholder="you@example.com"
           value={emailInput} onChange={(e) => setEmailInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') cloud.sendCode(emailInput) }}
@@ -4735,8 +4750,9 @@ function AuthFlow({ cloud, intro }) {
         <div style={{ fontSize: 14, color: C.ink, lineHeight: 1.6, marginBottom: 16 }}>
           {withEmail('codeSentBody')}
         </div>
-        <label style={{ ...fieldLabelStyle, marginTop: 0 }}>{t('code')}</label>
+        <label htmlFor="cloud-code" style={{ ...fieldLabelStyle, marginTop: 0 }}>{t('code')}</label>
         <input
+          id="cloud-code"
           type="text" inputMode="numeric" autoComplete="one-time-code" placeholder="12345678" maxLength={10}
           value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
           onKeyDown={(e) => { if (e.key === 'Enter') cloud.verifyCode(code) }}

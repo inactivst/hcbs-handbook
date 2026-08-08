@@ -7,6 +7,7 @@ import js from '@eslint/js'
 import globals from 'globals'
 import react from 'eslint-plugin-react'
 import reactHooks from 'eslint-plugin-react-hooks'
+import a11y from 'eslint-plugin-jsx-a11y'
 
 export default [
   { ignores: ['dist/**', 'ios/**', 'node_modules/**', 'public/**', 'drafts/**'] },
@@ -23,9 +24,32 @@ export default [
       parserOptions: { ecmaFeatures: { jsx: true } },
       globals: { ...globals.browser, ...globals.es2021, __APP_VERSION__: 'readonly', __APP_BUILD__: 'readonly' },
     },
-    plugins: { react, 'react-hooks': reactHooks },
+    plugins: { react, 'react-hooks': reactHooks, 'jsx-a11y': a11y },
     settings: { react: { version: 'detect' } },
     rules: {
+      // ─── ACCESSIBILITY ────────────────────────────────────────────────────
+      // This app's audience is people with disabilities and the advocates working
+      // on their behalf, so these are not polish. Ported from BlackBook and
+      // GuestBook, where the same rules found controls drawn as divs and fields
+      // with no name that repeated hand passes had walked past.
+      //
+      // `label-has-associated-control`, NOT `control-has-associated-label`. Every
+      // field here already had a visible translated <label> above it and simply was
+      // not wired to it; the fix was htmlFor/id, and this is the rule that checks
+      // that relationship. The other rule cannot resolve htmlFor across the tree, so
+      // it would report 12 permanent false positives on fields that are now correct
+      // — and a warning that is always there is a warning nobody reads.
+      'jsx-a11y/label-has-associated-control': ['error', { assert: 'either', depth: 3 }],
+      'jsx-a11y/no-static-element-interactions': 'error',
+      'jsx-a11y/click-events-have-key-events': 'error',
+      'jsx-a11y/no-noninteractive-element-interactions': 'error',
+      'jsx-a11y/aria-props': 'error',
+      'jsx-a11y/aria-role': 'error',
+      'jsx-a11y/role-has-required-aria-props': 'error',
+      'jsx-a11y/role-supports-aria-props': 'error',
+      'jsx-a11y/alt-text': 'error',
+      'jsx-a11y/anchor-is-valid': 'error',
+
       'no-unused-vars': ['warn', { args: 'none', ignoreRestSiblings: true, varsIgnorePattern: '^_' }],
       // So components referenced only inside JSX aren't falsely flagged unused.
       'react/jsx-uses-vars': 'error',
